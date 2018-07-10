@@ -16,6 +16,7 @@ pytest = "*"
 pytest-cov = "*"
 pytest-sugar = "*"
 codecov = "*"
+pylint = "*"
 
 [requires]
 python_version = "3.7"
