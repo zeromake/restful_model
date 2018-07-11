@@ -1,6 +1,6 @@
 import asyncio
 import sqlalchemy as sa
-import sqlalchemy.sql.ddl
+from sqlalchemy.sql.ddl import CreateTable, DropTable
 from typing import List, Optional, cast
 
 DRIVER_NAME = (
@@ -71,11 +71,11 @@ class DataBase(object):
             )
         self.engine = engine
     
-    def create_table_sql(self, table: 'sa.Table') -> str:
+    def create_table_sql(self, table: 'sa.Table') -> CreateTable:
         """
         生成创建表的 sql
         """
-        return ddl.CreateTable(table)
+        return CreateTable(table)
 
     async def create_table(self, table: 'sa.Table', conn=None) -> None:
         """
@@ -100,11 +100,11 @@ class DataBase(object):
                     await transaction.close()
                     raise e
     
-    def drop_table_sql(self, table: 'sa.Table') -> str:
+    def drop_table_sql(self, table: 'sa.Table') -> DropTable:
         """
         生成删除表的sql语句
         """
-        return ddl.DropTable(table)
+        return DropTable(table)
 
     async def drop_table(self, table: 'sa.Table', conn=None) -> None:
         """
@@ -112,9 +112,9 @@ class DataBase(object):
         """
         if conn is None:
             async with engine.acquire() as conn:
-                await conn.execute(ddl.DropTable(table))
+                await conn.execute(self.drop_table_sql(table))
         else:
-            await conn.execute(ddl.DropTable(table))
+            await conn.execute(self.drop_table_sql(table))
 
 
     async def drop_tables(self, tables: List['sa.Table']) -> None:
@@ -125,7 +125,7 @@ class DataBase(object):
             async with conn.begin() as transaction:
                 try:
                     for table in tables:
-                        await conn.execute(ddl.DropTable(table))
+                        await conn.execute(self.drop_table_sql(table))
                 except Exception as e:
                     await transaction.close()
                     raise e

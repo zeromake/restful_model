@@ -8,9 +8,10 @@ Welcome to restful_model's documentation!
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
 
-
+   README <README>
+   更新日志 <CHANGELOG>
+   权限设计 <permissions>
 
 Indices and tables
 ==================
