@@ -2,6 +2,7 @@ import asyncio
 import sqlalchemy as sa
 from sqlalchemy.sql.ddl import CreateTable, DropTable
 from typing import List, Optional, cast
+from urllib.parse import unquote_plus
 
 DRIVER_NAME = (
     "sqlite",
@@ -16,6 +17,8 @@ class DataBase(object):
     """
     def __init__(self, database: str, loop=None) -> None:
         self._url = sa.engine.url.make_url(database)
+        if "%" in self._url.database:
+            self._url.database = unquote_plus(self._url.database)
         self._driver: Optional[str] = None
         self._load_driver()
         self._loop = loop or asyncio.get_event_loop()
@@ -35,6 +38,8 @@ class DataBase(object):
         """
         创建engine
         """
+        if self.engine is not None:
+            return
         loop = self._loop
         if self._driver == "sqlite":
             from aiosqlite3.sa import create_engine
@@ -95,7 +100,7 @@ class DataBase(object):
             async with conn.begin() as transaction:
                 try:
                     for table in tables:
-                        await conn.execute(self.create_table_sql(table))
+                        return await conn.execute(self.create_table_sql(table))
                 except Exception as e:
                     await transaction.close()
                     raise e
@@ -112,7 +117,7 @@ class DataBase(object):
         """
         if conn is None:
             async with engine.acquire() as conn:
-                await conn.execute(self.drop_table_sql(table))
+                return await conn.execute(self.drop_table_sql(table))
         else:
             await conn.execute(self.drop_table_sql(table))
 
@@ -136,12 +141,12 @@ class DataBase(object):
         """
         sql = None
         if self._driver == "sqlite":
-            sql = "SELECT name FROM sqlite_master where type='table' and name='%s'" % name
+            sql = "SELECT name FROM sqlite_master where type='table' and name='%s'" % table_name
         elif self._driver == "mysql":
             sql = "SELECT TABLE_NAME FROM information_schema.TABLES "\
-            "WHERE TABLE_NAME ='%s' AND TABLE_SCHEMA = '%s'" % (name, self._url.database)
+            "WHERE TABLE_NAME ='%s' AND TABLE_SCHEMA = '%s'" % (table_name, self._url.database)
         elif self._driver == "postgresql":
-            sql = "SELECT relname FROM pg_class WHERE relname = '%s'" % name
+            sql = "SELECT relname FROM pg_class WHERE relname = '%s'" % table_name
         if conn is None:
             async with self.engine.acquire() as conn:
                 result = await conn.execute(sql)

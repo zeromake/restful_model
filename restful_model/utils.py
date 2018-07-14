@@ -8,28 +8,16 @@ filter_list_type = Union[List[str], Set[str], None]
 def return_true(*args):
     return True
 
-def get_filter_list(block_list: filter_list_type=None, white_list: filter_list_type=None, keys=None):
+def get_filter_list(block_list: filter_list_type=None, white_list: filter_list_type=None):
     """
     生成过滤黑白名单
     """
-    if not block_list and not white_list and not keys:
+    if not block_list and not white_list:
         return return_true
     if block_list and isinstance(block_list, list):
         block_list = set(block_list)
     if white_list and isinstance(white_list, list):
         white_list = set(white_list)
-    if keys and len(keys) > 0:
-        for key in keys:
-            if key[0] == "-":
-                if not block_list:
-                    block_list = set()
-                block_list.add(key[1:])
-            else:
-                if not white_list:
-                    white_list = set()
-                white_list.add(key)
-    if not block_list and not white_list:
-        return return_true
     
     def filter_list(key: str) -> bool:
         """
@@ -68,15 +56,15 @@ def handle_param(column, data):
             return column.in_(value)
         elif opt == '$nin':
             return ~column.in_(value)
-        elif opt == "$day":
-            column = sa.extract("day", column)
-            return handle_param(column, value)
-        elif opt == "$month":
-            column = sa.extract("month", column)
-            return handle_param(column, value)
-        elif opt == "$year":
-            column = sa.extract("year", column)
-            return handle_param(column, value)
+        # elif opt == "$day":
+        #     column = sa.extract("day", column)
+        #     return handle_param(column, value)
+        # elif opt == "$month":
+        #     column = sa.extract("month", column)
+        #     return handle_param(column, value)
+        # elif opt == "$year":
+        #     column = sa.extract("year", column)
+        #     return handle_param(column, value)
         elif opt == '$bind':
             # 占位符
             if isinstance(value, str):
@@ -121,6 +109,8 @@ def handle_where_param(column_name, form_data, filter_list=return_true, is_or=Fa
     """
     处理带主键的参数
     """
+    if form_data is None:
+        return
     data = []
     for key, val in form_data.items():
         if key == "$or" or key == "$and":
@@ -163,7 +153,27 @@ def update_sql(model: sa.Table, data, filter_list=return_true) -> dml.Update:
     """
     生成更新语句对象
     """
-    pass
+    if isinstance(data, list):
+        res = []
+        for d in data:
+            res.append(update_sql(model, d, filter_list))
+        return res
+    where = data.get("where")
+    where_data = handle_where_param(model.columns, where, filter_list)
+    values = data["values"]
+    values_data = {}
+    for key, val in values.items():
+        if filter_list(key):
+            if val.startswith("$bind."):
+                values_data[key] = bindparam(val[6:])
+            else:
+                values_data[key] = val
+    if where_data is not None:
+        sql = model.update().where(where_data)
+    else:
+        sql = model.update()
+    return sql.values(values_data)
+
 
 def handle_orders(columns, orders, filter_list):
     """
@@ -185,25 +195,45 @@ def handle_orders(columns, orders, filter_list):
         return order_by
 
 
-def handle_func(columns, func, filter_list):
+def handle_keys(columns, keys, filter_list):
     res = []
-    for column in columns:
-        if filter_list(column.name):
-            fn = func.get(column.name)
-            if fn and hasattr(sa.func, fn):
-                temp = getattr(sa.func, fn)(column)
-                res.append(temp)
-            else:
-                res.append(column)
+    if isinstance(keys, (list, set)):
+        for key in keys:
+            if key in columns and filter_list(key):
+                res.append(columns[key])
+    else:
+        for column in columns:
+            column_name = column.name
+            if filter_list(column_name) and column_name in keys:
+                value = keys[column_name]
+                if isinstance(value, str):
+                    if hasattr(sa.func, value):
+                        temp = getattr(sa.func, value)(column)
+                        res.append(temp)
+                elif isinstance(value, dict):
+                    func_name = value["func"]
+                    if hasattr(sa.func, func_name):
+                        func = getattr(sa.func, func_name)
+                        label = value.get("label")
+                        args = value.get("args")
+                        if args:
+                            temp = func(column, *args)
+                        else:
+                            temp = func(column)
+                        if label:
+                            temp = temp.label(label)
+                        res.append(temp)
+                else:
+                    res.append(column)
     return res
 
-def select_sql(model: sa.Table, data, filter_list=return_true, orders=None, limit=None, group=None, func=None):
+def select_sql(model: sa.Table, data, filter_list=return_true, keys=None, orders=None, limit=None, group=None):
     """
     生成查询语句对象
     """
     where_data = handle_where_param(model.columns, data, filter_list)
-    if func:
-        columns = handle_func(model.columns, func, filter_list)
+    if keys:
+        columns = handle_keys(model.columns, keys, filter_list)
     else:
         columns = [column for column in model.columns if filter_list(column.name)]
     sql = sa.sql.select(columns).where(where_data)

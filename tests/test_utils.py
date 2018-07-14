@@ -6,6 +6,7 @@ from restful_model.utils import (
     insert_sql,
     delete_sql,
     select_sql,
+    update_sql,
 )
 import sqlalchemy as sa
 from sqlalchemy.sql.expression import bindparam
@@ -51,6 +52,12 @@ User = sa.Table(
         nullable=False,
         doc="密码"
     ),
+    sa.Column(
+        "create_time",
+        sa.BigInteger,
+        nullable=False,
+        doc="创建时间"
+    )
 )
 
 
@@ -92,15 +99,6 @@ def test_get_filter_list() -> None:
     assert not filter_list("id")
     assert filter_list("test")
     assert not filter_list("test2")
-    filter_list = get_filter_list(["key", "id"], ["test"], {"gg", "-ggg"})
-    assert filter_list("gg")
-    assert not filter_list("ggg")
-    filter_list = get_filter_list(keys={"gg", "-ggg"})
-    assert filter_list("gg")
-    assert not filter_list("ggg")
-    filter_list = get_filter_list(keys=set())
-
-
 
 def test_handle_param() -> None:
     """
@@ -446,7 +444,7 @@ def test_select_sql() -> None:
     """
     测试查询
     """
-    filter_list = get_filter_list(keys={"-password"})
+    filter_list = get_filter_list(block_list={"password"})
     sql = select_sql(User, {
         "id": 1,
     }, filter_list)
@@ -488,10 +486,10 @@ def test_select_sql() -> None:
         sa.sql.select([sa.func.count("*").label("$count")]).where(User.c.id==1),
     )
     # max
-    filter_list = get_filter_list(keys={"id", "account"})
+    filter_list = get_filter_list(white_list={"id", "account", "create_time"})
     sql = select_sql(User, {
         "id": 1,
-    }, filter_list, orders={"id"}, func={"id": "max"}, group=["id", "account"])
+    }, filter_list, orders={"id"}, keys={"id": "max", "account": None}, group=["id", "account"])
     assert assert_param(
         sql,
         sa.sql
@@ -502,3 +500,99 @@ def test_select_sql() -> None:
             .order_by(User.c.id)
             .group_by(User.c.id, User.c.account)
     )
+    sql = select_sql(User, {
+        "id": 1,
+    }, keys={"create_time": {"func": "from_unixtime", "args": [r"%Y-%m-%d %H:%i:%s"]}, "id": None, "account": None})
+    assert assert_param(
+        sql,
+        sa.sql
+            .select(
+                [
+                    User.c.id,
+                    User.c.account,
+                    sa.func.from_unixtime(User.c.create_time, r"%Y-%m-%d %H:%i:%s")
+                ]
+            )
+            .where(User.c.id==1)
+    )
+
+
+    sql = select_sql(User, {
+        "id": 1,
+    }, keys={"create_time": {"func": "max", "label": "max_time"}, "id": None, "account": None})
+    assert assert_param(
+        sql,
+        sa.sql
+            .select(
+                [
+                    User.c.id,
+                    User.c.account,
+                    sa.func.max(User.c.create_time).label("max_time")
+                ]
+            )
+            .where(User.c.id==1)
+    )
+
+    sql = select_sql(User, {
+        "id": 1,
+    }, keys=["id", "account", "create_time"])
+    assert assert_param(
+        sql,
+        sa.sql
+            .select(
+                [
+                    User.c.id,
+                    User.c.account,
+                    User.c.create_time
+                ]
+            )
+            .where(User.c.id==1)
+    )
+
+def test_update_sql():
+    """
+    测试更新语句
+    """
+    sql = update_sql(User, {
+        "where": {
+            "id": 1,
+        },
+        "values": {
+            "account": "change"
+        }
+    })
+    assert assert_param(
+        sql,
+        User.update().where(User.c.id == 1).values({"account": "change"})
+    )
+
+    sql = update_sql(User, {
+        "values": {
+            "account": "change"
+        }
+    })
+    assert assert_param(
+        sql,
+        User.update().values({"account": "change"})
+    )
+
+    sql = update_sql(User, {
+        "values": {
+            "account": "$bind.account1"
+        }
+    })
+    assert assert_param(
+        sql,
+        User.update().values({"account": bindparam("account1")})
+    )
+
+    sql = update_sql(User, [{
+        "values": {
+            "account": "$bind.account1"
+        }
+    }])
+    assert assert_param(
+        sql[0],
+        User.update().values({"account": bindparam("account1")})
+    )
+

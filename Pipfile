@@ -18,6 +18,7 @@ pytest-sugar = "*"
 codecov = "*"
 pylint = "*"
 "aiosqlite3" = "*"
+pytest-asyncio = "*"
 
 [requires]
 python_version = "3.7"
