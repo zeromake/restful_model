@@ -62,10 +62,7 @@ async def test_create_engine() -> None:
     assert not data._url.host
     assert not data._url.port
     assert not data._url.password
-    await data.create_engine(echo=True)
+    data.engine = await data.create_engine(echo=True)
     assert data.engine is not None
     await data.create_table(User)
     assert await data.exists_table("user")
-
-
-    

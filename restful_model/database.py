@@ -21,7 +21,7 @@ class DataBase(object):
             self._url.database = unquote_plus(self._url.database)
         self._driver: Optional[str] = None
         self._load_driver()
-        self._loop = loop or asyncio.get_event_loop()
+        self._loop = cast(asyncio.AbstractEventLoop, loop or asyncio.get_event_loop())
         # self._tables = tables
         self.engine = None
 
@@ -38,21 +38,19 @@ class DataBase(object):
         """
         创建engine
         """
-        if self.engine is not None:
-            return
         loop = self._loop
         if self._driver == "sqlite":
-            from aiosqlite3.sa import create_engine
+            from aiosqlite3.sa import create_engine as sqlite_create_engine
             # init = os.path.exists(self._url.database)
-            engine = await create_engine(
+            engine = await sqlite_create_engine(
                 self._url.database,
                 loop=loop,
                 *args,
                 **kwargs,
             )
         elif self._driver == "mysql":
-            from aiomysql.sa import create_engine
-            engine = await create_engine(
+            from aiomysql.sa import create_engine as mysql_create_engine
+            engine = await mysql_create_engine(
                 user=self._url.username,
                 db=self._url.database,
                 host=self._url.host,
@@ -63,8 +61,8 @@ class DataBase(object):
                 **kwargs,
             )
         elif self._driver == "postgresql":
-            from aiopg.sa import create_engine
-            engine = await create_engine(
+            from aiopg.sa import create_engine as pg_create_engine
+            engine = await pg_create_engine(
                 user=self._url.username,
                 database=self._url.database,
                 host=self._url.host,
@@ -74,7 +72,7 @@ class DataBase(object):
                 *args,
                 **kwargs,
             )
-        self.engine = engine
+        return engine
     
     def create_table_sql(self, table: 'sa.Table') -> CreateTable:
         """
@@ -96,7 +94,7 @@ class DataBase(object):
         """
         创建多个表
         """
-        async with engine.acquire() as conn:
+        async with self.engine.acquire() as conn:
             async with conn.begin() as transaction:
                 try:
                     for table in tables:
@@ -116,7 +114,7 @@ class DataBase(object):
         删除表
         """
         if conn is None:
-            async with engine.acquire() as conn:
+            async with self.engine.acquire() as conn:
                 return await conn.execute(self.drop_table_sql(table))
         else:
             await conn.execute(self.drop_table_sql(table))
@@ -126,7 +124,7 @@ class DataBase(object):
         """
         删除多个表
         """
-        async with engine.acquire() as conn:
+        async with self.engine.acquire() as conn:
             async with conn.begin() as transaction:
                 try:
                     for table in tables:
@@ -178,3 +176,20 @@ class DataBase(object):
             else:
                 cursor = await conn.execute(sql)
                 return getattr((await cursor.first()), key)
+    
+    async def execute_dml(self, sql, data=None):
+        """
+        执行DML语句
+        """
+        engine = self.engine
+        async with engine.acquire() as conn:
+            async with conn.begin():
+                count = 0
+                if isinstance(sql, list):
+                    for s in sql:
+                        async with conn.execute(s) as cursor:
+                            count += cursor.rowcount
+                else:
+                    async with conn.execute(sql, data) as cursor:
+                        count = cursor.rowcount
+                return count

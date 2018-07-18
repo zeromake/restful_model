@@ -6,3 +6,6 @@ build:
 
 test:
 	pytest -s -v --cov-report term --cov-report html --cov restful_model tests
+
+mypy:
+	mypy --ignore-missing-imports restful_model

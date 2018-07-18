@@ -242,6 +242,8 @@ def select_sql(model: sa.Table, data, filter_list=return_true, keys=None, orders
         for g in group:
             if g in model.columns and filter_list(g):
                 group_by.append(model.columns[g])
+            elif g not in model.columns:
+                return group_by.append(g)
         if len(group_by) > 0:
             sql = sql.group_by(*group_by)
     if orders:
@@ -254,4 +256,10 @@ def select_sql(model: sa.Table, data, filter_list=return_true, keys=None, orders
         sql_count = sa.sql.select([sa.func.count("*").label("$count")]).where(where_data)
         return sql, sql_count
     return sql
-            
+
+
+def model_to_dict(row):
+    """
+    把model查询出的row转换为dict
+    """
+    return {key: val for key, val in row.items()}

@@ -11,3 +11,4 @@ __pycache__/
 /htmlcov/
 /.pytest_cache/
 build/
+.mypy_cache/

@@ -19,6 +19,9 @@ codecov = "*"
 pylint = "*"
 "aiosqlite3" = "*"
 pytest-asyncio = "*"
+mypy = "*"
+aiomysql = "*"
+aiopg = "*"
 
 [requires]
 python_version = "3.7"
