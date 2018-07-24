@@ -1,4 +1,5 @@
 from sanic import Sanic
+from sanic.constants import HTTP_METHODS
 from restful_model import DataBase
 from restful_model.extend.sanic.view import ApiView
 from .model import User
@@ -11,7 +12,7 @@ def to_timestamp(obj: datetime) -> int:
     """
     毫秒值
     """
-    return int(obj.timestamp() * 1000)
+    return int(obj.timestamp())
 
 def get_offset_timestamp(**kwargs) -> int:
     """
@@ -25,7 +26,7 @@ class UserView(ApiView):
     __filter_keys__ = {
         "post": ({"id",},),
         "get": ({"password",},),
-        "put": ({"id",},),
+        "put": ({"id", "create_time"},),
     }
     async def post_filter(self, context):
         now = get_offset_timestamp()
@@ -50,7 +51,9 @@ async def setup_db(app, loop):
         if not await app.db.exists_table(User.name):
             await app.db.create_table(User)
 
-app.add_route(UserView.as_view(app.db), "/user")
+view = UserView.as_view(app.db)
+app.add_route(view, "/user", HTTP_METHODS)
+app.add_route(view, "/user/query", {"POST",})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)

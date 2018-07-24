@@ -40,7 +40,7 @@ class ApiView(BaseView):
             view.__module__ = cls.__module__
             for decorator in cls.decorators:
                 view = decorator(view)
-        view.view_class = cls
+        view._view_class = cls
         view.self = self
         view.__doc__ = cls.__doc__
         view.__module__ = cls.__module__

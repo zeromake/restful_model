@@ -200,9 +200,10 @@ def handle_orders(columns, orders, filter_list):
                 order_by.append(sa.desc(column))
             else:
                 order_by.append(column)
+        elif order not in columns:
+            order_by.append(sa.desc(order) if is_desc else order)
     if len(order_by) > 0:
         return order_by
-
 
 def handle_keys(columns, keys, filter_list):
     res = []
@@ -226,18 +227,16 @@ def handle_keys(columns, keys, filter_list):
                         label = value.get("label")
                         args = value.get("args")
                         if args:
-                            arg = []
-                            flag = False
-                            for s in args:
-                                if s == "$column":
-                                    flag = True
-                                    arg.append(column)
-                                else:
-                                    arg.append(s)
-                            if flag:
+                            if "$column" in args:
+                                arg = []
+                                for s in args:
+                                    if s == "$column":
+                                        arg.append(column)
+                                    else:
+                                        arg.append(s)
                                 temp = func(*arg)
                             else:
-                                temp = func(column, *arg)
+                                temp = func(column, *args)
                         else:
                             temp = func(column)
                         if label:
@@ -265,7 +264,7 @@ def select_sql(model: sa.Table, data, filter_list=return_true, keys=None, orders
             if g in model.columns and filter_list(g):
                 group_by.append(model.columns[g])
             elif g not in model.columns:
-                return group_by.append(g)
+                group_by.append(g)
         if len(group_by) > 0:
             sql = sql.group_by(*group_by)
     if orders:
@@ -273,7 +272,9 @@ def select_sql(model: sa.Table, data, filter_list=return_true, keys=None, orders
         if order_by:
             sql = sql.order_by(*order_by)
     if limit:
-        column = columns[0]
+        for c in model.columns:
+            column = c
+            break
         offset_num, limit_num = limit
         sql = sql.offset(offset_num).limit(limit_num)
         sql_count = sa.sql.select([sa.func.count(column).label("_count")])

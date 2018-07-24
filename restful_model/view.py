@@ -13,7 +13,7 @@ from .utils import (
 )
 from .context import Context
 
-QUERY_ARGS = ("keys", "where", "limit", "orders", "group")
+QUERY_ARGS = ("keys", "where", "limit", "order", "group")
 
 class BaseView(object):
     """
@@ -37,7 +37,7 @@ class BaseView(object):
         keys = form_data.get("keys")
         where = form_data.get("where")
         limit = form_data.get("limit")
-        orders = form_data.get("orders")
+        orders = form_data.get("order")
         group = form_data.get("group")
         sql_count = None
         if limit:
@@ -131,6 +131,7 @@ class BaseView(object):
         分发请求
         """
         method = context.method
+
         if method == "get":
             try:
                 for k in QUERY_ARGS:
@@ -138,6 +139,14 @@ class BaseView(object):
                         context.form_data[k] = json.loads(context.args[k][0])
             except Exception:
                 pass
+        if context.url_path.endswith("/query") or context.url_path.endswith("/query/"):
+            if method == "post":
+                method = "get"
+            else:
+                return {
+                    "status": 405,
+                    "message": "Method Not Allowed",
+                }
         if self.__methods__ is not None and method not in self.__methods__:
             return {
                 "status": 405,
