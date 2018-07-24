@@ -21,7 +21,7 @@ class DataBase(object):
             self._url.database = unquote_plus(self._url.database)
         self._driver: Optional[str] = None
         self._load_driver()
-        self._loop = cast(asyncio.AbstractEventLoop, loop or asyncio.get_event_loop())
+        self.loop = cast(asyncio.AbstractEventLoop, loop)
         # self._tables = tables
         self.engine = None
 
@@ -38,7 +38,7 @@ class DataBase(object):
         """
         创建engine
         """
-        loop = self._loop
+        loop = self.loop
         if self._driver == "sqlite":
             from aiosqlite3.sa import create_engine as sqlite_create_engine
             # init = os.path.exists(self._url.database)

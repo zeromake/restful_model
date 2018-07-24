@@ -1,4 +1,5 @@
 import base64
+import json
 
 from .database import DataBase
 from .utils import (
@@ -8,9 +9,11 @@ from .utils import (
     delete_sql,
     update_sql,
     get_filter_list,
+    return_true,
 )
 from .context import Context
 
+QUERY_ARGS = ("keys", "where", "limit", "orders", "group")
 
 class BaseView(object):
     """
@@ -41,7 +44,7 @@ class BaseView(object):
             sql, sql_count = select_sql(self.__model__, where, filter_keys, keys, orders, limit, group)
             async with self.db.engine.acquire() as conn:
                 async with conn.execute(sql_count) as cursor:
-                    total = (await cursor.first()).count
+                    total = (await cursor.first())._count
                 async with conn.execute(sql) as cursor:
                     data = await cursor.fetchall()
                     data = [model_to_dict(row) for row in data]
@@ -128,6 +131,13 @@ class BaseView(object):
         分发请求
         """
         method = context.method
+        if method == "get":
+            try:
+                for k in QUERY_ARGS:
+                    if k in context.args:
+                        context.form_data[k] = json.loads(context.args[k][0])
+            except Exception:
+                pass
         if self.__methods__ is not None and method not in self.__methods__:
             return {
                 "status": 405,
@@ -149,7 +159,7 @@ class BaseView(object):
                         "status": 401,
                         "message": "Unauthorized",
                     }
-            filter_keys = None
+            filter_keys = return_true
             if self.__filter_keys__ is not None:
                 if isinstance(self.__filter_keys__, list):
                     filter_keys = get_filter_list(*self.__filter_keys__)
@@ -158,11 +168,11 @@ class BaseView(object):
             handle = getattr(self, method, None)
             return await handle(context, filter_keys)
         except Exception as e:
+            # raise e
             return {
                 "status": 500,
-                "message": "dispatch_request: " + e,
+                "message": "dispatch_request: " + str(e),
             }
-        
 
 def generate_basic_auth_view(
         view,
@@ -216,34 +226,35 @@ def generate_basic_auth_view(
 
 def generate_token_auth_view(
         view,
-        verify_token=None,
-        sessions_key="is_login",
+        decode_token=None,
+        sessions_key="token",
     ):
     class TokenAuthView(view):
         """
         通用 Token 认证视图
         """
-        verify_token = verify_token
+        decode_token = decode_token
         sessions_key = sessions_key
 
         async def auth_filter(self, context: Context):
             """
             通过 Token 认证
             """
-            if self.verify_token is None:
+            if self.decode_token is None:
                 return True
             sessions = context.sessions
             if sessions is not None and self.sessions_key is not None:
-                is_login = sessions.get(self.sessions_key, False)
-                if is_login:
-                    return True
-            headers = context.headers
-            token = headers.get("Authorization")
+                token = sessions.get(self.sessions_key, "")
+            else:
+                headers = context.headers
+                token = headers.get("Authorization")
             if token is None:
                 return False
-            if self.verify_token(token):
+            payload = self.decode_token(token)
+            if payload is not None:
+                context.payload = payload
                 if sessions is not None and self.sessions_key is not None:
-                    sessions[self.sessions_key] = True
+                    sessions[self.sessions_key] = token
                     return True
             return False
     return TokenAuthView

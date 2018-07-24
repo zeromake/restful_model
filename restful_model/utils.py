@@ -147,7 +147,9 @@ def delete_sql(model: sa.Table, data, filter_list=return_true) -> dml.Delete:
     生成删除语句对象
     """
     where_data = handle_where_param(model.columns, data, filter_list)
-    return model.delete().where(where_data)
+    if where_data is not None:
+        return model.delete().where(where_data)
+    return model.delete()
 
 def update_sql(model: sa.Table, data, filter_list=return_true) -> dml.Update:
     """
@@ -163,9 +165,16 @@ def update_sql(model: sa.Table, data, filter_list=return_true) -> dml.Update:
     values = data["values"]
     values_data = {}
     for key, val in values.items():
-        if filter_list(key):
+        if key in model.columns and filter_list(key):
             if val.startswith("$bind."):
                 values_data[key] = bindparam(val[6:])
+            if val.startswith("$incr."):
+                incr = int(val[:6])
+                column = getattr(model.columns, key)
+                if incr > 0:
+                    values_data[key] = column + incr
+                elif incr < 0:
+                    values_data[key] = column - (-incr)
             else:
                 values_data[key] = val
     if where_data is not None:
@@ -217,7 +226,18 @@ def handle_keys(columns, keys, filter_list):
                         label = value.get("label")
                         args = value.get("args")
                         if args:
-                            temp = func(column, *args)
+                            arg = []
+                            flag = False
+                            for s in args:
+                                if s == "$column":
+                                    flag = True
+                                    arg.append(column)
+                                else:
+                                    arg.append(s)
+                            if flag:
+                                temp = func(*arg)
+                            else:
+                                temp = func(column, *arg)
                         else:
                             temp = func(column)
                         if label:
@@ -236,7 +256,9 @@ def select_sql(model: sa.Table, data, filter_list=return_true, keys=None, orders
         columns = handle_keys(model.columns, keys, filter_list)
     else:
         columns = [column for column in model.columns if filter_list(column.name)]
-    sql = sa.sql.select(columns).where(where_data)
+    sql = sa.sql.select(columns)
+    if where_data is not None:
+        sql = sql.where(where_data)
     if group:
         group_by = []
         for g in group:
@@ -251,9 +273,12 @@ def select_sql(model: sa.Table, data, filter_list=return_true, keys=None, orders
         if order_by:
             sql = sql.order_by(*order_by)
     if limit:
+        column = columns[0]
         offset_num, limit_num = limit
         sql = sql.offset(offset_num).limit(limit_num)
-        sql_count = sa.sql.select([sa.func.count("*").label("$count")]).where(where_data)
+        sql_count = sa.sql.select([sa.func.count(column).label("_count")])
+        if where_data is not None:
+            sql_count = sql_count.where(where_data)
         return sql, sql_count
     return sql
 

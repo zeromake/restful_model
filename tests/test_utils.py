@@ -483,7 +483,7 @@ def test_select_sql() -> None:
     )
     assert assert_param(
         sql_count,
-        sa.sql.select([sa.func.count("*").label("$count")]).where(User.c.id==1),
+        sa.sql.select([sa.func.count(User.c.id).label("_count")]).where(User.c.id==1),
     )
     # max
     filter_list = get_filter_list(white_list={"id", "account", "create_time"})
