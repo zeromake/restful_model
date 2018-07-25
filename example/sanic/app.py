@@ -35,7 +35,6 @@ class UserView(ApiView):
         else:
             for d in context.form_data:
                 d["create_time"] = now
-        return True
 
 
 app = Sanic()

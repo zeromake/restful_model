@@ -33,7 +33,7 @@ class DataBase(object):
             if self._url.drivername.startswith(name):
                 self._driver = name
                 break
-    
+
     async def create_engine(self, *args, **kwargs) -> None:
         """
         创建engine
@@ -73,7 +73,7 @@ class DataBase(object):
                 **kwargs,
             )
         return engine
-    
+
     def create_table_sql(self, table: 'sa.Table') -> CreateTable:
         """
         生成创建表的 sql
@@ -96,12 +96,8 @@ class DataBase(object):
         """
         async with self.engine.acquire() as conn:
             async with conn.begin() as transaction:
-                try:
-                    for table in tables:
-                        return await conn.execute(self.create_table_sql(table))
-                except Exception as e:
-                    await transaction.close()
-                    raise e
+                for table in tables:
+                    return await conn.execute(self.create_table_sql(table))
     
     def drop_table_sql(self, table: 'sa.Table') -> DropTable:
         """
@@ -119,19 +115,14 @@ class DataBase(object):
         else:
             await conn.execute(self.drop_table_sql(table))
 
-
     async def drop_tables(self, tables: List['sa.Table']) -> None:
         """
         删除多个表
         """
         async with self.engine.acquire() as conn:
             async with conn.begin() as transaction:
-                try:
-                    for table in tables:
-                        await conn.execute(self.drop_table_sql(table))
-                except Exception as e:
-                    await transaction.close()
-                    raise e
+                for table in tables:
+                    await conn.execute(self.drop_table_sql(table))
 
     async def exists_table(self, table_name: str, conn=None) -> bool:
         """
@@ -176,8 +167,8 @@ class DataBase(object):
             else:
                 cursor = await conn.execute(sql)
                 return getattr((await cursor.first()), key)
-    
-    async def execute_dml(self, sql, data=None):
+
+    async def execute_dml(self, sql, data=None, conn=None):
         """
         执行DML语句
         """
@@ -193,3 +184,18 @@ class DataBase(object):
                     async with conn.execute(sql, data) as cursor:
                         count = cursor.rowcount
                 return count
+
+    async def execute_insert(self, sql, conn=None):
+        """
+        执行插入语句
+        """
+        if conn is None:
+            engine = self.engine
+            async with engine.acquire() as conn:
+                async with conn.begin():
+                    async with conn.execute(sql) as cursor:
+                        return cursor.lastrowid, cursor.rowcount
+        else:
+            async with conn.begin():
+                async with conn.execute(sql) as cursor:
+                    return cursor.lastrowid, cursor.rowcount

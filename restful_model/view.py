@@ -14,6 +14,10 @@ from .utils import (
 from .context import Context
 
 QUERY_ARGS = ("keys", "where", "limit", "order", "group")
+UNAUTH = {
+    "status": 401,
+    "message": "Default Unauthorized",
+}
 
 class BaseView(object):
     """
@@ -155,19 +159,15 @@ class BaseView(object):
         try:
             if hasattr(self, "auth_filter"):
                 filter_method = getattr(self, "auth_filter")
-                if not await filter_method(context):
-                    return {
-                        "status": 401,
-                        "message": "Default Unauthorized",
-                    }
+                res = await filter_method(context)
+                if res is not None:
+                    return res
             filter_method_name = method + "_filter"
             if hasattr(self, filter_method_name):
                 filter_method = getattr(self, filter_method_name)
-                if not await filter_method(context):
-                    return {
-                        "status": 401,
-                        "message": "Unauthorized",
-                    }
+                res = await filter_method(context)
+                if res is not None:
+                    return res
             filter_keys = return_true
             if self.__filter_keys__ is not None:
                 if isinstance(self.__filter_keys__, list):
@@ -207,16 +207,16 @@ def generate_basic_auth_view(
             过滤所有请求
             """
             if self.auth_model is None or self.verify_password is None:
-                return True
+                return None
             sessions = context.sessions
             if sessions is not None:
                 is_login = sessions.get(self.sessions_key, False)
                 if is_login:
-                    return True
+                    return None
             headers = context.headers
             auth = headers.get("Authorization")
             if auth is None:
-                return False
+                return UNAUTH
             auth_str = base64.decodestring(auth)
             name, pwd = auth_str.split(":")
             sql = self.auth_model.select().where(self.auth_model[self.name_key] == name)
@@ -224,13 +224,13 @@ def generate_basic_auth_view(
                 async with conn.execute(sql) as cursor:
                     row = await cursor.first()
                     if row is None:
-                        return False
+                        return UNAUTH
                     password = row[self.pwd_key]
                     if self.verify_password(pwd, password):
                         if sessions is not None:
                             sessions[self.sessions_key] = True
-                            return True
-            return False
+                            return None
+            return UNAUTH
     return BasicAuthView
 
 def generate_token_auth_view(
@@ -250,7 +250,7 @@ def generate_token_auth_view(
             通过 Token 认证
             """
             if self.decode_token is None:
-                return True
+                return None
             sessions = context.sessions
             if sessions is not None and self.sessions_key is not None:
                 token = sessions.get(self.sessions_key, "")
@@ -258,12 +258,12 @@ def generate_token_auth_view(
                 headers = context.headers
                 token = headers.get("Authorization")
             if token is None:
-                return False
+                return UNAUTH
             payload = self.decode_token(token)
             if payload is not None:
                 context.payload = payload
                 if sessions is not None and self.sessions_key is not None:
                     sessions[self.sessions_key] = token
-                    return True
-            return False
+                    return None
+            return UNAUTH
     return TokenAuthView

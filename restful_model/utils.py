@@ -168,8 +168,8 @@ def update_sql(model: sa.Table, data, filter_list=return_true) -> dml.Update:
         if key in model.columns and filter_list(key):
             if val.startswith("$bind."):
                 values_data[key] = bindparam(val[6:])
-            if val.startswith("$incr."):
-                incr = int(val[:6])
+            elif val.startswith("$incr."):
+                incr = int(val[6:])
                 column = getattr(model.columns, key)
                 if incr > 0:
                     values_data[key] = column + incr

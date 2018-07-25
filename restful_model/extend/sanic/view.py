@@ -29,7 +29,7 @@ class ApiView(BaseView):
                 elif isinstance(i, dict):
                     h = i
             return response.json(res, headers=h, status=status)
-        return response.json(resp, headers={"Content-Type": "application/json;;charset=utf-8"}, status=resp["status"])
+        return response.json(resp, headers={"Content-Type": "application/json;charset=utf-8"}, status=resp["status"])
 
     @classmethod
     def as_view(cls, *class_args, **class_kwargs):
