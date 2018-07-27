@@ -5,7 +5,7 @@ build:
 	python setup.py bdist_egg
 
 test:
-	pytest -s -v --cov-report term --cov-report html --cov restful_model tests
+	pytest -s -vv --cov-report term --cov-report html --cov restful_model tests
 
 mypy:
 	mypy --ignore-missing-imports restful_model

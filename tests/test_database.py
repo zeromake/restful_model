@@ -2,6 +2,7 @@ import logging
 import asyncio
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.sql.expression import bindparam
 from urllib.parse import quote_plus as urlquote, unquote_plus
 from datetime import datetime, timezone, timedelta
 from restful_model.database import DataBase
@@ -89,7 +90,10 @@ async def test_create_engine() -> None:
 async def test_execute_sql() -> None:
     db = urlquote(":memory:")
     data = DataBase("sqlite:///%s" % db, asyncio.get_event_loop())
+    # data = DataBase("mysql+pymysql://aiomysql:mypass@127.0.0.1:3306/test_pymysql", asyncio.get_event_loop())
     data.engine = await data.create_engine(echo=True)
+    # if await data.exists_table("user"):
+        # await data.drop_table(User)
     await data.create_table(User)
     user1 = {
         "account": "test1",
@@ -123,6 +127,25 @@ async def test_execute_sql() -> None:
         async with conn.execute(sql) as cursor:
             user2["id"] = 3
             assert user2 == model_to_dict(await cursor.first())
-
-
+        sql1 = User.update().where(User.c.id == bindparam("id")).values({
+            "account": bindparam("account"),
+        })
+        async with conn.execute(sql1, {"id": 1, "account": "gggg"}) as cursor:
+            assert 1 == cursor.rowcount
+        sql = User.select().where(User.c.id == 1)
+        async with conn.execute(sql) as cursor:
+            user1["id"] = 1
+            user1["account"] = "gggg"
+            assert user1 == model_to_dict(await cursor.first())
+        async with conn.execute(sql1, [{"id": 1, "account": "test5"}, {"id": 2, "account": "test6"}] ) as cursor:
+            assert 2 == cursor.rowcount
+        sql = User.select().where(User.c.id < 3)
+        async with conn.execute(sql) as cursor:
+            user1["id"] = 1
+            user1["account"] = "test5"
+            assert user1 == model_to_dict(await cursor.fetchone())
+            user1["id"] = 2
+            user1["account"] = "test6"
+            assert user1 == model_to_dict(await cursor.fetchone())
+    await data.drop_table(User)
 

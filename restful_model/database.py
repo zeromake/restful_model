@@ -56,7 +56,7 @@ class DataBase(object):
                 host=self._url.host,
                 password=self._url.password,
                 port=self._url.port,
-                loop=loop
+                loop=loop,
                 *args,
                 **kwargs,
             )
