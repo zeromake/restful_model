@@ -50,9 +50,9 @@ async def setup_db(app, loop):
         if not await app.db.exists_table(User.name):
             await app.db.create_table(User)
 
-view = UserView.as_view(app.db)
-app.add_route(view, "/user", HTTP_METHODS)
-app.add_route(view, "/user/query", {"POST",})
+userView = UserView.as_view(app.db)
+app.add_route(userView, "/user", HTTP_METHODS)
+app.add_route(userView, "/user/<id:int>", HTTP_METHODS)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)

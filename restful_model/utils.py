@@ -212,6 +212,8 @@ def handle_keys(columns, keys, filter_list):
             if key in columns and filter_list(key):
                 res.append(columns[key])
     else:
+        if "$keys" in keys:
+            res = handle_keys(columns, keys["$keys"], filter_list)
         for column in columns:
             column_name = column.name
             if filter_list(column_name) and column_name in keys:

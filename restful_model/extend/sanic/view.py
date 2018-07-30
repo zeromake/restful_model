@@ -33,6 +33,9 @@ class ApiView(BaseView):
 
     @classmethod
     def as_view(cls, *class_args, **class_kwargs):
+        """
+        创建一个对象
+        """
         self = cls(*class_args, **class_kwargs)
         async def view(*args, **kwargs):
             return await self.sanic_dispatch_request(*args, **kwargs)
@@ -40,7 +43,7 @@ class ApiView(BaseView):
             view.__module__ = cls.__module__
             for decorator in cls.decorators:
                 view = decorator(view)
-        view._view_class = cls
+        # view._view_class = cls
         view.self = self
         view.__doc__ = cls.__doc__
         view.__module__ = cls.__module__

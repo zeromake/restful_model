@@ -32,6 +32,7 @@ class BaseView(object):
     """
     def __init__(self, db: DataBase):
         self.db = db
+        self.cache = {}
 
     async def get(self, context: Context, filter_keys):
         """
@@ -44,7 +45,7 @@ class BaseView(object):
         orders = form_data.get("order")
         group = form_data.get("group")
         sql_count = None
-        if limit:
+        if limit and not context.has_param:
             sql, sql_count = select_sql(self.__model__, where, filter_keys, keys, orders, limit, group)
             async with self.db.engine.acquire() as conn:
                 async with conn.execute(sql_count) as cursor:
@@ -69,8 +70,11 @@ class BaseView(object):
             sql = select_sql(self.__model__, where, filter_keys, keys, orders, limit, group)
             async with self.db.engine.acquire() as conn:
                 async with conn.execute(sql) as cursor:
-                    data = await cursor.fetchall()
-                    data = [model_to_dict(row) for row in data]
+                    if context.has_param:
+                        data = model_to_dict(await cursor.first())
+                    else:
+                        data = await cursor.fetchall()
+                        data = [model_to_dict(row) for row in data]
                     return {
                         'status': 200,
                         'message': "Query ok!",
@@ -100,7 +104,7 @@ class BaseView(object):
         sql = delete_sql(self.__model__, form_data, filter_keys)
         count = await self.db.execute_dml(sql)
         return {
-            'status': 204,
+            'status': 200,
             'message': "Delete ok!",
             "meta": {
                 "count": count,
@@ -112,9 +116,9 @@ class BaseView(object):
         更新
         """
         form_data = context.form_data
-        values = form_data.get("values")
+        # values = form_data.get("values")
         data = form_data.get("data")
-        sql = update_sql(self.__model__, values, filter_keys)
+        sql = update_sql(self.__model__, form_data, filter_keys)
         count = await self.db.execute_dml(sql, data)
         return {
             'status': 201,
@@ -130,58 +134,70 @@ class BaseView(object):
         """
         return await self.put(context, filter_keys)
 
-    async def dispatch_request(self, context: Context):
+    async def dispatch_request(
+        self,
+        context: Context,
+        method_filter=True,
+        decorator_filter=True,
+        key_filter=True,
+    ):
         """
         分发请求
         """
         method = context.method
-
-        if method == "get":
+        if method == "get" and len(context.args) > 0:
             try:
                 for k in QUERY_ARGS:
                     if k in context.args:
                         context.form_data[k] = json.loads(context.args[k][0])
             except Exception:
                 pass
-        if context.url_path.endswith("/query") or context.url_path.endswith("/query/"):
-            if method == "post":
-                method = "get"
-            else:
-                return {
-                    "status": 405,
-                    "message": "Method Not Allowed",
-                }
-        if self.__methods__ is not None and method not in self.__methods__:
+        if "method" in context.args:
+            method = context.args["method"][0]
+        if method_filter and self.__methods__ is not None and method not in self.__methods__:
             return {
                 "status": 405,
                 "message": "Method Not Allowed",
             }
         try:
-            if hasattr(self, "auth_filter"):
-                filter_method = getattr(self, "auth_filter")
-                res = await filter_method(context)
-                if res is not None:
-                    return res
-            filter_method_name = method + "_filter"
-            if hasattr(self, filter_method_name):
-                filter_method = getattr(self, filter_method_name)
-                res = await filter_method(context)
-                if res is not None:
-                    return res
             filter_keys = return_true
-            if self.__filter_keys__ is not None:
-                if isinstance(self.__filter_keys__, list):
-                    filter_keys = get_filter_list(*self.__filter_keys__)
-                elif method in self.__filter_keys__:
-                    filter_keys = get_filter_list(*self.__filter_keys__[method])
+            if decorator_filter:
+                if hasattr(self, "auth_filter"):
+                    filter_method = getattr(self, "auth_filter")
+                    res = await filter_method(context)
+                    if res is not None:
+                        return res
+                filter_method_name = method + "_filter"
+                if hasattr(self, filter_method_name):
+                    filter_method = getattr(self, filter_method_name)
+                    res = await filter_method(context)
+                    if res is not None:
+                        return res
+            if key_filter:
+                if method in self.cache:
+                    filter_keys = self.cache[method]
+                else:
+                    if self.__filter_keys__ is not None:
+                        if isinstance(self.__filter_keys__, list):
+                            filter_keys = get_filter_list(*self.__filter_keys__)
+                        elif method in self.__filter_keys__:
+                            filter_keys = get_filter_list(*self.__filter_keys__[method])
+                    self.cache[method] = filter_keys
             handle = getattr(self, method, None)
-            return await handle(context, filter_keys)
+            res = await handle(context, filter_keys)
+            return res
         except Exception as e:
-            # raise e
             return {
                 "status": 500,
                 "message": "dispatch_request: " + str(e),
             }
+
+    async def raw_dispatch_request(self, context: Context):
+        """
+        跳过所有过滤器
+        """
+        return await self.dispatch_request(context, False, False, False)
+
 
 def generate_basic_auth_view(
         view,
