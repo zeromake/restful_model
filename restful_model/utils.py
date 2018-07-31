@@ -1,9 +1,12 @@
+import logging
 import sqlalchemy as sa
 from sqlalchemy.sql import dml, ddl
 from sqlalchemy.sql.expression import bindparam
 from typing import Union, List, Set
 
 filter_list_type = Union[List[str], Set[str], None]
+
+LOGGER = logging.getLogger(__package__)
 
 def return_true(*args):
     return True
@@ -151,7 +154,7 @@ def delete_sql(model: sa.Table, data, filter_list=return_true) -> dml.Delete:
         return model.delete().where(where_data)
     return model.delete()
 
-def update_sql(model: sa.Table, data, filter_list=return_true) -> dml.Update:
+def update_sql(model: sa.Table, data, filter_list=return_true, where_filter=return_true) -> dml.Update:
     """
     生成更新语句对象
     """
@@ -161,7 +164,7 @@ def update_sql(model: sa.Table, data, filter_list=return_true) -> dml.Update:
             res.append(update_sql(model, d, filter_list))
         return res
     where = data.get("where")
-    where_data = handle_where_param(model.columns, where, filter_list)
+    where_data = handle_where_param(model.columns, where, where_filter)
     values = data["values"]
     values_data = {}
     for key, val in values.items():
@@ -205,48 +208,42 @@ def handle_orders(columns, orders, filter_list):
     if len(order_by) > 0:
         return order_by
 
+
 def handle_keys(columns, keys, filter_list):
     res = []
-    if isinstance(keys, (list, set)):
-        for key in keys:
-            if key in columns and filter_list(key):
-                res.append(columns[key])
-    else:
-        if "$keys" in keys:
-            res = handle_keys(columns, keys["$keys"], filter_list)
-        for column in columns:
-            column_name = column.name
-            if filter_list(column_name) and column_name in keys:
-                value = keys[column_name]
-                if isinstance(value, str):
-                    if hasattr(sa.func, value):
-                        temp = getattr(sa.func, value)(column)
-                        res.append(temp)
-                elif isinstance(value, dict):
-                    func_name = value["func"]
-                    if hasattr(sa.func, func_name):
-                        func = getattr(sa.func, func_name)
-                        label = value.get("label")
-                        args = value.get("args")
-                        if args:
-                            if "$column" in args:
-                                arg = []
-                                for s in args:
-                                    if s == "$column":
-                                        arg.append(column)
-                                    else:
-                                        arg.append(s)
-                                temp = func(*arg)
-                            else:
-                                temp = func(column, *args)
+    for key in keys:
+        if isinstance(key, dict):
+            func_name = key.get("func")
+            label = key.get("label")
+            args = key.get("args")
+            column_name = key.get("column")
+            if column_name in columns and filter_list(column_name):
+                column = columns[column_name]
+                if func_name and hasattr(sa.func, func_name):
+                    func = getattr(sa.func, func_name)
+                    if args:
+                        if "$column" in args:
+                            arg = []
+                            for s in args:
+                                if s == "$column":
+                                    arg.append(column)
+                                else:
+                                    arg.append(s)
+                            temp = func(*arg)
                         else:
-                            temp = func(column)
-                        if label:
-                            temp = temp.label(label)
-                        res.append(temp)
-                else:
-                    res.append(column)
+                            temp = func(column, *args)
+                    else:
+                        temp = func(column)
+                    column = temp
+                if label:
+                    column = column.label(label)
+                res.append(column)
+        elif isinstance(key, str) and key in columns and filter_list(key):
+            res.append(columns[key])
+        else:
+            LOGGER.warn("utils.handle_keys: `%s` key not is str or dict", key)
     return res
+
 
 def select_sql(model: sa.Table, data, filter_list=return_true, keys=None, orders=None, limit=None, group=None):
     """

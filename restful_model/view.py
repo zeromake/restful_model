@@ -10,6 +10,7 @@ from .utils import (
     update_sql,
     get_filter_list,
     return_true,
+    LOGGER,
 )
 from .context import Context
 
@@ -117,6 +118,7 @@ class BaseView(object):
         """
         form_data = context.form_data
         # values = form_data.get("values")
+        # where = form_data.get("where")
         data = form_data.get("data")
         sql = update_sql(self.__model__, form_data, filter_keys)
         count = await self.db.execute_dml(sql, data)
@@ -187,6 +189,7 @@ class BaseView(object):
             res = await handle(context, filter_keys)
             return res
         except Exception as e:
+            LOGGER.error("view.BaseView.dispatch_request Error", exc_info=e)
             return {
                 "status": 500,
                 "message": "dispatch_request: " + str(e),

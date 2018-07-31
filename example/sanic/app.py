@@ -20,6 +20,7 @@ def get_offset_timestamp(**kwargs) -> int:
     """
     return to_timestamp(datetime.now(timezone.utc) + timedelta(**kwargs))
 
+
 class UserView(ApiView):
     __model__ = User
     __methods__ = {"post", "get", "put"}
