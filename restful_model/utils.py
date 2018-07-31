@@ -7,6 +7,8 @@ from typing import Union, List, Set
 filter_list_type = Union[List[str], Set[str], None]
 
 LOGGER = logging.getLogger(__package__)
+POSTGRE_TO_MYSQL = {}
+
 
 def return_true(*args):
     return True
@@ -165,25 +167,30 @@ def update_sql(model: sa.Table, data, filter_list=return_true, where_filter=retu
         return res
     where = data.get("where")
     where_data = handle_where_param(model.columns, where, where_filter)
-    values = data["values"]
+    values = data.get("values")
+    if not values:
+        raise TypeError("update not has values")
     values_data = {}
     for key, val in values.items():
         if key in model.columns and filter_list(key):
-            if val.startswith("$bind."):
-                values_data[key] = bindparam(val[6:])
-            elif val.startswith("$incr."):
-                incr = int(val[6:])
-                column = getattr(model.columns, key)
-                if incr > 0:
-                    values_data[key] = column + incr
-                elif incr < 0:
-                    values_data[key] = column - (-incr)
+            if isinstance(val, str):
+                if val.startswith("$bind."):
+                    values_data[key] = bindparam(val[6:])
+                elif val.startswith("$incr."):
+                    incr = int(val[6:])
+                    column = getattr(model.columns, key)
+                    if incr > 0:
+                        values_data[key] = column + incr
+                    elif incr < 0:
+                        values_data[key] = column - (-incr)
             else:
                 values_data[key] = val
     if where_data is not None:
         sql = model.update().where(where_data)
     else:
         sql = model.update()
+    if len(values_data) == 0:
+        raise TypeError("update not has values")
     return sql.values(values_data)
 
 
@@ -209,7 +216,7 @@ def handle_orders(columns, orders, filter_list):
         return order_by
 
 
-def handle_keys(columns, keys, filter_list):
+def handle_keys(columns, keys, filter_list, drivername):
     res = []
     for key in keys:
         if isinstance(key, dict):
@@ -219,6 +226,19 @@ def handle_keys(columns, keys, filter_list):
             column_name = key.get("column")
             if column_name in columns and filter_list(column_name):
                 column = columns[column_name]
+                if drivername == "sqlite":
+                    if func_name == "from_unixtime":
+                        func_name = "strftime"
+                        format_str = args[0].replace(r"%i", r"%M")
+                        args = [format_str, "$column", "unixepoch"]
+                    elif func_name == "date_format":
+                        func_name = "strftime"
+                        format_str = args[0].replace(r"%i", r"%M")
+                        args = [format_str, "$column"]
+                elif drivername == "postgresql":
+                    if func_name == "from_unixtime":
+                        func_name = "to_char"
+
                 if func_name and hasattr(sa.func, func_name):
                     func = getattr(sa.func, func_name)
                     if args:
@@ -245,13 +265,22 @@ def handle_keys(columns, keys, filter_list):
     return res
 
 
-def select_sql(model: sa.Table, data, filter_list=return_true, keys=None, orders=None, limit=None, group=None):
+def select_sql(
+    model: sa.Table,
+    data,
+    filter_list=return_true,
+    keys=None,
+    orders=None,
+    limit=None,
+    group=None,
+    drivername=None
+):
     """
     生成查询语句对象
     """
     where_data = handle_where_param(model.columns, data, filter_list)
     if keys:
-        columns = handle_keys(model.columns, keys, filter_list)
+        columns = handle_keys(model.columns, keys, filter_list, drivername)
     else:
         columns = [column for column in model.columns if filter_list(column.name)]
     sql = sa.sql.select(columns)

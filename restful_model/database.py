@@ -24,6 +24,9 @@ class DataBase(object):
         self.loop = cast(asyncio.AbstractEventLoop, loop)
         # self._tables = tables
         self.engine = None
+    
+    def drivername(self):
+        return self._driver
 
     def _load_driver(self) -> None:
         """
@@ -174,15 +177,15 @@ class DataBase(object):
         """
         engine = self.engine
         async with engine.acquire() as conn:
-            if isinstance(sql, list):
-                async with conn.begin():
+            async with conn.begin():
+                if isinstance(sql, list):
                     count = 0
                     for s in sql:
                         async with conn.execute(s) as cursor:
                             count += cursor.rowcount
-            else:
-                async with conn.execute(sql, data) as cursor:
-                    count = cursor.rowcount
+                else:
+                    async with conn.execute(sql, data) as cursor:
+                        count = cursor.rowcount
             return count
 
     async def execute_insert(self, sql, conn=None):

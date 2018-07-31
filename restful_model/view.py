@@ -47,7 +47,16 @@ class BaseView(object):
         group = form_data.get("group")
         sql_count = None
         if limit and not context.has_param:
-            sql, sql_count = select_sql(self.__model__, where, filter_keys, keys, orders, limit, group)
+            sql, sql_count = select_sql(
+                self.__model__,
+                where,
+                filter_keys,
+                keys,
+                orders,
+                limit,
+                group,
+                self.db.drivername()
+            )
             async with self.db.engine.acquire() as conn:
                 async with conn.execute(sql_count) as cursor:
                     total = (await cursor.first())._count
@@ -68,7 +77,16 @@ class BaseView(object):
                     }
                 }
         else:
-            sql = select_sql(self.__model__, where, filter_keys, keys, orders, limit, group)
+            sql = select_sql(
+                self.__model__,
+                where,
+                filter_keys,
+                keys,
+                orders,
+                limit,
+                group,
+                self.db.drivername()
+            )
             async with self.db.engine.acquire() as conn:
                 async with conn.execute(sql) as cursor:
                     if context.has_param:

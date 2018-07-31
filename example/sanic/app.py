@@ -8,17 +8,25 @@ from datetime import datetime, timezone, timedelta
 
 logging.basicConfig(level=logging.DEBUG)
 
+UTC8 = timezone(timedelta(hours=8))
+
 def to_timestamp(obj: datetime) -> int:
     """
-    毫秒值
+    秒值
     """
     return int(obj.timestamp())
 
-def get_offset_timestamp(**kwargs) -> int:
+def get_offset_timestamp(zone=None, **kwargs) -> int:
     """
     获取偏移时间戳
+
+    :param zone: 时区
+    :param **kwargs: 时间偏移参数
+    :returns: timestamp 该时区的秒
     """
-    return to_timestamp(datetime.now(timezone.utc) + timedelta(**kwargs))
+    if zone is None:
+        return to_timestamp(datetime.now(timezone.utc) + timedelta(**kwargs))
+    return to_timestamp(datetime.now(zone).replace(tzinfo=timezone.utc) + timedelta(**kwargs))
 
 
 class UserView(ApiView):
@@ -27,7 +35,7 @@ class UserView(ApiView):
     __filter_keys__ = {
         "post": ({"id",},),
         "get": ({"password",},),
-        "put": ({"id", "create_time"},),
+        "put": ({"id",},),
     }
     async def post_filter(self, context):
         now = get_offset_timestamp()
@@ -40,6 +48,7 @@ class UserView(ApiView):
 
 app = Sanic()
 
+# db = DataBase("mysql://aiomysql:mypass@127.0.0.1:3306/test_pymysql")
 db = DataBase("sqlite:///db.db")
 app.db = db
 
