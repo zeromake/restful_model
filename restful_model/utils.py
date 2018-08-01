@@ -183,6 +183,8 @@ def update_sql(model: sa.Table, data, filter_list=return_true, where_filter=retu
                         values_data[key] = column + incr
                     elif incr < 0:
                         values_data[key] = column - (-incr)
+                else:
+                    values_data[key] = val
             else:
                 values_data[key] = val
     if where_data is not None:

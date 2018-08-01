@@ -489,7 +489,7 @@ def test_select_sql() -> None:
     filter_list = get_filter_list(white_list={"id", "account", "create_time"})
     sql = select_sql(User, {
         "id": 1,
-    }, filter_list, orders={"id"}, keys={"id": "max", "account": None}, group=["id", "account"])
+    }, filter_list, orders={"id"}, keys=[{"column": "id", "func": "max"}, "account"], group=["id", "account"])
     assert assert_param(
         sql,
         sa.sql
@@ -502,15 +502,14 @@ def test_select_sql() -> None:
     )
     sql = select_sql(User, {
         "id": 1,
-    }, keys={"create_time": {"func": "from_unixtime", "args": [r"%Y-%m-%d %H:%i:%s"]}, "id": None, "account": None})
+    }, keys=[{ "column": "create_time", "func": "from_unixtime", "args": [r"%Y-%m-%d %H:%i:%s"]}, "id", "account"])
     assert assert_param(
         sql,
-        sa.sql
-            .select(
+        sa.sql.select(
                 [
+                    sa.func.from_unixtime(User.c.create_time, r"%Y-%m-%d %H:%i:%s"),
                     User.c.id,
                     User.c.account,
-                    sa.func.from_unixtime(User.c.create_time, r"%Y-%m-%d %H:%i:%s")
                 ]
             )
             .where(User.c.id==1)
@@ -519,15 +518,15 @@ def test_select_sql() -> None:
 
     sql = select_sql(User, {
         "id": 1,
-    }, keys={"create_time": {"func": "max", "label": "max_time"}, "id": None, "account": None})
+    }, keys=[{"column": "create_time", "func": "max", "label": "max_time"}, "id", "account"])
     assert assert_param(
         sql,
         sa.sql
             .select(
                 [
+                    sa.func.max(User.c.create_time).label("max_time"),
                     User.c.id,
                     User.c.account,
-                    sa.func.max(User.c.create_time).label("max_time")
                 ]
             )
             .where(User.c.id==1)
