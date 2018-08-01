@@ -99,9 +99,9 @@ class MainHandler(ApiView):
 async def make_app(loop):
     db = DataBase("sqlite:///db.db", loop)
     db.engine = await db.create_engine()
-    # userView = MainHandler.as_view(db)
+    userView = MainHandler.as_view(db)
     router = tornado.web.Application([
-        ("/user", MainHandler, {"db": db})
+        ("/user", userView)
     ])
     return router
 

@@ -2,8 +2,9 @@ import asyncio
 import tornado.ioloop
 import tornado.web
 from example.tornado.app import make_app
+import uvloop 
 # from example.sanic.app import app
-
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 loop = asyncio.get_event_loop()
 
 if __name__ == "__main__":
