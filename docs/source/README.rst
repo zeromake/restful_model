@@ -12,6 +12,7 @@ sanic
 app.py
 
 .. code-block:: python
+
     import sqlalchemy as sa
     from sanic import Sanic
     from sanic.constants import HTTP_METHODS
@@ -61,6 +62,7 @@ app.py
 curl test
 
 .. code-block:: bash
+
     $ # create
     $ curl -X POST http://127.0.0.1:8000/user \
     -H 'content-type: application/json' \
@@ -83,6 +85,7 @@ curl test
     > {"status":200,"message":"Delete ok!","meta":{"count":1}}
     $ curl -X GET http://127.0.0.1:8000/user
     > {"status":200,"message":"Query ok!","data":[]}
+
 Links
 -----
 
