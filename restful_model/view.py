@@ -153,6 +153,8 @@ class BaseView(object):
         更新
         """
         return await self.put(context, filter_keys)
+    # async def options(self, context, filter_keys):
+        # return {}, {"Access-Control-Allow-Methods", ", ".join([m.upper() for m in self.__methods__])}
 
     async def dispatch_request(
         self,
@@ -180,19 +182,8 @@ class BaseView(object):
                 "message": "Method Not Allowed",
             }
         try:
+            decorator_filters = self.generate_filter(method, decorator_filter)
             filter_keys = return_true
-            if decorator_filter:
-                if hasattr(self, "auth_filter"):
-                    filter_method = getattr(self, "auth_filter")
-                    res = await filter_method(context)
-                    if res is not None:
-                        return res
-                filter_method_name = method + "_filter"
-                if hasattr(self, filter_method_name):
-                    filter_method = getattr(self, filter_method_name)
-                    res = await filter_method(context)
-                    if res is not None:
-                        return res
             if key_filter:
                 if method in self.cache:
                     filter_keys = self.cache[method]
@@ -203,15 +194,39 @@ class BaseView(object):
                         elif method in self.__filter_keys__:
                             filter_keys = get_filter_list(*self.__filter_keys__[method])
                     self.cache[method] = filter_keys
-            handle = getattr(self, method, None)
-            res = await handle(context, filter_keys)
-            return res
+
+            async def next_handle():
+                """
+                中间件模式
+                """
+                handle, ok = next(decorator_filters)
+                if ok:
+                    return await handle(context, filter_keys)
+                else:
+                    return await handle(context, next_handle)
+            return await next_handle()
         except Exception as e:
             LOGGER.error("view.BaseView.dispatch_request Error", exc_info=e)
             return {
                 "status": 500,
                 "message": "dispatch_request: " + str(e),
             }
+
+    def generate_filter(self, method, decorator_filter):
+        """
+        把所有的方法都作为中间件处理
+
+        :param method: 请求方法
+        :param decorator_filter: 是否进行过滤
+        :yield call: 
+        """
+        if decorator_filter:
+            if hasattr(self, "auth_filter"):
+                yield getattr(self, "auth_filter"), False
+            filter_method_name = method + "_filter"
+            if hasattr(self, filter_method_name):
+                yield getattr(self, filter_method_name), False
+        yield getattr(self, method), True
 
     async def raw_dispatch_request(self, context: Context):
         """
@@ -239,17 +254,17 @@ def generate_basic_auth_view(
         verify_password = verify_password
         sessions_key = sessions_key
 
-        async def auth_filter(self, context: Context):
+        async def auth_filter(self, context: Context, next_filter):
             """
             过滤所有请求
             """
             if self.auth_model is None or self.verify_password is None:
-                return None
+                return await next_filter()
             sessions = context.sessions
             if sessions is not None:
                 is_login = sessions.get(self.sessions_key, False)
                 if is_login:
-                    return None
+                    return await next_filter()
             headers = context.headers
             auth = headers.get("Authorization")
             if auth is None:
@@ -266,7 +281,7 @@ def generate_basic_auth_view(
                     if self.verify_password(pwd, password):
                         if sessions is not None:
                             sessions[self.sessions_key] = True
-                            return None
+                            return await next_filter()
             return UNAUTH
     return BasicAuthView
 
@@ -282,12 +297,12 @@ def generate_token_auth_view(
         decode_token = decode_token
         sessions_key = sessions_key
 
-        async def auth_filter(self, context: Context):
+        async def auth_filter(self, context: Context, next_filter):
             """
             通过 Token 认证
             """
             if self.decode_token is None:
-                return None
+                return await next_filter()
             sessions = context.sessions
             if sessions is not None and self.sessions_key is not None:
                 token = sessions.get(self.sessions_key, "")
@@ -301,6 +316,6 @@ def generate_token_auth_view(
                 context.payload = payload
                 if sessions is not None and self.sessions_key is not None:
                     sessions[self.sessions_key] = token
-                    return None
+                    return await next_filter()
             return UNAUTH
     return TokenAuthView

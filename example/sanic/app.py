@@ -37,13 +37,14 @@ class UserView(ApiView):
         "get": ({"password",},),
         "put": ({"id",},),
     }
-    async def post_filter(self, context):
+    async def post_filter(self, context, next_handle):
         now = get_offset_timestamp()
         if isinstance(context.form_data, dict):
             context.form_data["create_time"] = now
         else:
             for d in context.form_data:
                 d["create_time"] = now
+        return await next_handle()
 
 
 app = Sanic()
