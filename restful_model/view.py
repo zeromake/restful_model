@@ -142,7 +142,7 @@ class BaseView(object):
         count = await self.db.execute_dml(sql, data)
         return {
             'status': 201,
-            'message': "Insert ok!",
+            'message': "Update ok!",
             "meta": {
                 "count": count,
             },

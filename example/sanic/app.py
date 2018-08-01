@@ -1,7 +1,7 @@
 from sanic import Sanic
 from sanic.constants import HTTP_METHODS
 from restful_model import DataBase
-from restful_model.extend.sanic.view import ApiView
+from restful_model.extend.sanic import ApiView
 from .model import User
 import logging
 from datetime import datetime, timezone, timedelta

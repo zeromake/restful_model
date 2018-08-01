@@ -2,6 +2,10 @@ from restful_model.view import BaseView
 from restful_model.context import Context
 from sanic import response
 
+
+__all__ = ["ApiView"]
+
+
 class ApiView(BaseView):
     decorators = None
     async def sanic_dispatch_request(self, request, *args, **kwargs):
