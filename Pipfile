@@ -23,6 +23,7 @@ mypy = "*"
 aiomysql = "*"
 aiopg = "*"
 sanic = "*"
+tornado = "*"
 
 [requires]
 python_version = "3.7"

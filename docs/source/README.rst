@@ -6,7 +6,7 @@ restful_model is an `sqlalchemy`_ auto generate REATful API
 Example
 -------
 
-sanic
+Sanic
 ^^^^^^
 
 app.py

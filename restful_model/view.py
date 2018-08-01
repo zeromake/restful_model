@@ -31,11 +31,11 @@ class BaseView(object):
     """
     通用请求响应处理器
     """
-    def __init__(self, db: DataBase):
+    def __init__(self, db: DataBase=None):
         self.db = db
         self.cache = {}
 
-    async def get(self, context: Context, filter_keys):
+    async def _get(self, context: Context, filter_keys):
         """
         GET 查询请求的统一调用
         """
@@ -100,7 +100,7 @@ class BaseView(object):
                         'data': data
                     }
 
-    async def post(self, context: Context, filter_keys):
+    async def _post(self, context: Context, filter_keys):
         """
         插入
         """
@@ -115,7 +115,7 @@ class BaseView(object):
             },
         }
 
-    async def delete(self, context: Context, filter_keys):
+    async def _delete(self, context: Context, filter_keys):
         """
         删除
         """
@@ -130,13 +130,11 @@ class BaseView(object):
             },
         }
 
-    async def put(self, context: Context, filter_keys):
+    async def _put(self, context: Context, filter_keys):
         """
         更新
         """
         form_data = context.form_data
-        # values = form_data.get("values")
-        # where = form_data.get("where")
         data = form_data.get("data")
         sql = update_sql(self.__model__, form_data, filter_keys)
         count = await self.db.execute_dml(sql, data)
@@ -148,11 +146,11 @@ class BaseView(object):
             },
         }
 
-    async def patch(self, context: Context, filter_keys):
+    async def _patch(self, context: Context, filter_keys):
         """
         更新
         """
-        return await self.put(context, filter_keys)
+        return await self._put(context, filter_keys)
     # async def options(self, context, filter_keys):
         # return {}, {"Access-Control-Allow-Methods", ", ".join([m.upper() for m in self.__methods__])}
 
@@ -226,7 +224,7 @@ class BaseView(object):
             filter_method_name = method + "_filter"
             if hasattr(self, filter_method_name):
                 yield getattr(self, filter_method_name), False
-        yield getattr(self, method), True
+        yield getattr(self, "_" + method), True
 
     async def raw_dispatch_request(self, context: Context):
         """

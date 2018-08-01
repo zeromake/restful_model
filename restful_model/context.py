@@ -18,7 +18,7 @@ class Context(object):
         self.url_path = url_path
         self.form_data: Optional[Dict[str, Any]] = (form_data or {})
         self.has_param = False
-        if len(url_param) > 0:
+        if url_param and len(url_param) > 0:
             if method != "delete":
                 where = self.form_data.get("where", {})
                 where.update(url_param)
