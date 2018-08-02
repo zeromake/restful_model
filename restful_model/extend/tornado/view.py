@@ -4,20 +4,30 @@ from restful_model.view import BaseView
 from restful_model.context import Context
 
 
-async def tornado_dispatch_request(self: "ApiView"):
+async def tornado_dispatch_request(self: "ApiView", *path_args, **kwargs):
     """
     分发请求
     """
     request = self.request
-    args = {k: [vv.decode() for vv in v] for k, v in request.query_arguments.items()}
+    args = {}
+    raw_args = {}
+    for k, v in request.query_arguments.items():
+        val = [vv.decode() for vv in v]
+        args[k] = val
+        raw_args[k] = val[0]
+    method = request.method.lower()
+    if method != "get" and request.body and request.body != b"":
+        form_data = json.loads(request.body)
+    else:
+        form_data = {}
     context = Context(
-        request.method.lower(),
+        method,
         request.path,
         request.headers,
-        None,
-        json.loads(request.body),
+        kwargs,
+        form_data,
         args,
-        None,
+        raw_args,
         self.session if hasattr(self, "session") else None,
     )
     resp = await self.view.dispatch_request(context)
@@ -37,13 +47,13 @@ async def tornado_dispatch_request(self: "ApiView"):
             for k, v in h:
                 self.set_header(k, v)
         self.set_status(status)
-        self.write(json.dumps(res).encode("utf-8"))
+        self.write(json.dumps(res, ensure_ascii=False).encode("utf-8"))
         return
     self.set_status(resp["status"])
-    self.write(json.dumps(resp).encode("utf-8"))
+    self.write(json.dumps(resp, ensure_ascii=False).encode("utf-8"))
 
 class ApiView(BaseView):
-    
+
     @classmethod
     def as_view(cls, *args, **kwargs):
         """

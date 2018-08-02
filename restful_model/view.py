@@ -13,7 +13,7 @@ from .utils import (
     LOGGER,
 )
 from .context import Context
-from .lru_cache import lru_cache
+# from .lru_cache import lru_cache
 
 QUERY_ARGS = ("keys", "where", "limit", "order", "group")
 UNAUTH = {
@@ -36,7 +36,6 @@ class BaseView(object):
         self.db = db
         self.cache = {}
 
-    @lru_cache(32)
     async def _get(self, context: Context, filter_keys):
         """
         GET 查询请求的统一调用

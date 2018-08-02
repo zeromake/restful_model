@@ -96,17 +96,20 @@ class MainHandler(ApiView):
                 d["create_time"] = now
         return await next_handle()
 
-async def make_app(loop):
-    db = DataBase("sqlite:///db.db", loop)
+async def make_app():
+    db = DataBase("sqlite:///db.db", asyncio.get_event_loop())
     db.engine = await db.create_engine()
     userView = MainHandler.as_view(db)
     router = tornado.web.Application([
-        ("/user", userView)
+        ("/user", userView),
+        (r"/user/(?P<id>\d+)", userView)
     ])
     return router
 
 if __name__ == "__main__":
+    loop = tornado.ioloop.IOLoop.current()
+    app = loop.run_sync(make_app)
     server = tornado.httpserver.HTTPServer(app)
     server.bind(8000)
     server.start(1)
-    tornado.ioloop.IOLoop.current().start()
+    loop.start()
