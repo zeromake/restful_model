@@ -36,7 +36,7 @@ class BaseView(object):
         self.db = db
         self.cache = {}
 
-    async def _get(self, context: Context, filter_keys):
+    async def get(self, context: Context, filter_keys):
         """
         GET 查询请求的统一调用
         """
@@ -101,22 +101,24 @@ class BaseView(object):
                         'data': data
                     }
 
-    async def _post(self, context: Context, filter_keys):
+    async def post(self, context: Context, filter_keys):
         """
         插入
         """
         form_data = context.form_data
         sql = insert_sql(self.__model__, form_data, filter_keys)
-        count = await self.db.execute_dml(sql)
-        return {
+        count, rowid = await self.db.execute_insert(sql)
+        res = {
             'status': 201,
             'message': "Insert ok!",
             "meta": {
+                "rowid": rowid if count == 1 else None,
                 "count": count,
             },
         }
+        return res
 
-    async def _delete(self, context: Context, filter_keys):
+    async def delete(self, context: Context, filter_keys):
         """
         删除
         """
@@ -131,7 +133,7 @@ class BaseView(object):
             },
         }
 
-    async def _put(self, context: Context, filter_keys):
+    async def put(self, context: Context, filter_keys):
         """
         更新
         """
@@ -147,11 +149,11 @@ class BaseView(object):
             },
         }
 
-    async def _patch(self, context: Context, filter_keys):
+    async def patch(self, context: Context, filter_keys):
         """
         更新
         """
-        return await self._put(context, filter_keys)
+        return await self.put(context, filter_keys)
     # async def options(self, context, filter_keys):
         # return {}, {"Access-Control-Allow-Methods", ", ".join([m.upper() for m in self.__methods__])}
 
@@ -166,15 +168,16 @@ class BaseView(object):
         分发请求
         """
         method = context.method
-        if method == "get" and len(context.args) > 0:
-            try:
-                for k in QUERY_ARGS:
-                    if k in context.args:
-                        context.form_data[k] = json.loads(context.args[k][0])
-            except Exception:
-                pass
-        if "method" in context.args:
-            method = context.args["method"][0]
+        if context.args and len(context.args) > 0:
+            if method == "get":
+                try:
+                    for k in QUERY_ARGS:
+                        if k in context.args:
+                            context.form_data[k] = json.loads(context.args[k][0])
+                except Exception:
+                    pass
+            if "method" in context.args:
+                method = context.args["method"][0]
         if method_filter and self.__methods__ is not None and method not in self.__methods__:
             return {
                 "status": 405,
@@ -225,7 +228,7 @@ class BaseView(object):
             filter_method_name = method + "_filter"
             if hasattr(self, filter_method_name):
                 yield getattr(self, filter_method_name), False
-        yield getattr(self, "_" + method), True
+        yield getattr(self, method), True
 
     async def raw_dispatch_request(self, context: Context):
         """
