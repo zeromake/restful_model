@@ -29,6 +29,7 @@ class BaseView(object):
     __methods__ = None
     __filter_keys__ = None
 
+
     """
     通用请求响应处理器
     """
@@ -112,10 +113,11 @@ class BaseView(object):
             'status': 201,
             'message': "Insert ok!",
             "meta": {
-                "rowid": rowid if count == 1 else None,
                 "count": count,
             },
         }
+        if count == 1:
+            res["meta"]["rowid"] = rowid
         return res
 
     async def delete(self, context: Context, filter_keys):
@@ -149,11 +151,11 @@ class BaseView(object):
             },
         }
 
-    async def patch(self, context: Context, filter_keys):
-        """
-        更新
-        """
-        return await self.put(context, filter_keys)
+    # async def patch(self, context: Context, filter_keys):
+    #     """
+    #     更新
+    #     """
+    #     return await self.put(context, filter_keys)
     # async def options(self, context, filter_keys):
         # return {}, {"Access-Control-Allow-Methods", ", ".join([m.upper() for m in self.__methods__])}
 
@@ -181,7 +183,7 @@ class BaseView(object):
         if method_filter and self.__methods__ is not None and method not in self.__methods__:
             return {
                 "status": 405,
-                "message": "Method Not Allowed",
+                "message": "Method Not Allowed: %s" % method,
             }
         try:
             decorator_filters = self.generate_filter(method, decorator_filter)
@@ -203,9 +205,15 @@ class BaseView(object):
                 """
                 handle, ok = next(decorator_filters)
                 if ok:
+                    if handle is None:
+                        return {
+                            "status": 405,
+                            "message": "Method Not Allowed: %s" % method,
+                        }
                     return await handle(context, filter_keys)
                 else:
                     return await handle(context, next_handle)
+    
             return await next_handle()
         except Exception as e:
             LOGGER.error("view.BaseView.dispatch_request Error", exc_info=e)
@@ -228,7 +236,7 @@ class BaseView(object):
             filter_method_name = method + "_filter"
             if hasattr(self, filter_method_name):
                 yield getattr(self, filter_method_name), False
-        yield getattr(self, method), True
+        yield getattr(self, method, None), True
 
     async def raw_dispatch_request(self, context: Context):
         """
@@ -236,88 +244,89 @@ class BaseView(object):
         """
         return await self.dispatch_request(context, False, False, False)
 
+    patch = put
+    options = get
+# def generate_basic_auth_view(
+#         view,
+#         auth_model,
+#         name_key="user_name",
+#         pwd_key="password",
+#         verify_password=None,
+#         sessions_key="is_login",
+#     ):
+#     class BasicAuthView(view):
+#         """
+#         BasicAuth 认证视图
+#         如果有 sessions 在一次会话中会自动挂载key 到 sessions 防止 api 请求每次查询数据库
+#         """
+#         auth_model = auth_model
+#         name_key = name_key
+#         pwd_key = pwd_key
+#         verify_password = verify_password
+#         sessions_key = sessions_key
 
-def generate_basic_auth_view(
-        view,
-        auth_model,
-        name_key="user_name",
-        pwd_key="password",
-        verify_password=None,
-        sessions_key="is_login",
-    ):
-    class BasicAuthView(view):
-        """
-        BasicAuth 认证视图
-        如果有 sessions 在一次会话中会自动挂载key 到 sessions 防止 api 请求每次查询数据库
-        """
-        auth_model = auth_model
-        name_key = name_key
-        pwd_key = pwd_key
-        verify_password = verify_password
-        sessions_key = sessions_key
+#         async def auth_filter(self, context: Context, next_filter):
+#             """
+#             过滤所有请求
+#             """
+#             if self.auth_model is None or self.verify_password is None:
+#                 return await next_filter()
+#             sessions = context.sessions
+#             if sessions is not None:
+#                 is_login = sessions.get(self.sessions_key, False)
+#                 if is_login:
+#                     return await next_filter()
+#             headers = context.headers
+#             auth = headers.get("Authorization")
+#             if auth is None:
+#                 return UNAUTH
+#             auth_str = base64.decodestring(auth)
+#             name, pwd = auth_str.split(":")
+#             sql = self.auth_model.select().where(self.auth_model[self.name_key] == name)
+#             async with self.db.engine.acquire() as conn:
+#                 async with conn.execute(sql) as cursor:
+#                     row = await cursor.first()
+#                     if row is None:
+#                         return UNAUTH
+#                     password = row[self.pwd_key]
+#                     if self.verify_password(pwd, password):
+#                         if sessions is not None:
+#                             sessions[self.sessions_key] = True
+#                             return await next_filter()
+#             return UNAUTH
+#     return BasicAuthView
 
-        async def auth_filter(self, context: Context, next_filter):
-            """
-            过滤所有请求
-            """
-            if self.auth_model is None or self.verify_password is None:
-                return await next_filter()
-            sessions = context.sessions
-            if sessions is not None:
-                is_login = sessions.get(self.sessions_key, False)
-                if is_login:
-                    return await next_filter()
-            headers = context.headers
-            auth = headers.get("Authorization")
-            if auth is None:
-                return UNAUTH
-            auth_str = base64.decodestring(auth)
-            name, pwd = auth_str.split(":")
-            sql = self.auth_model.select().where(self.auth_model[self.name_key] == name)
-            async with self.db.engine.acquire() as conn:
-                async with conn.execute(sql) as cursor:
-                    row = await cursor.first()
-                    if row is None:
-                        return UNAUTH
-                    password = row[self.pwd_key]
-                    if self.verify_password(pwd, password):
-                        if sessions is not None:
-                            sessions[self.sessions_key] = True
-                            return await next_filter()
-            return UNAUTH
-    return BasicAuthView
+# def generate_token_auth_view(
+#         view,
+#         decode_token=None,
+#         sessions_key="token",
+#     ):
+#     class TokenAuthView(view):
+#         """
+#         通用 Token 认证视图
+#         """
+#         decode_token = decode_token
+#         sessions_key = sessions_key
 
-def generate_token_auth_view(
-        view,
-        decode_token=None,
-        sessions_key="token",
-    ):
-    class TokenAuthView(view):
-        """
-        通用 Token 认证视图
-        """
-        decode_token = decode_token
-        sessions_key = sessions_key
-
-        async def auth_filter(self, context: Context, next_filter):
-            """
-            通过 Token 认证
-            """
-            if self.decode_token is None:
-                return await next_filter()
-            sessions = context.sessions
-            if sessions is not None and self.sessions_key is not None:
-                token = sessions.get(self.sessions_key, "")
-            else:
-                headers = context.headers
-                token = headers.get("Authorization")
-            if token is None:
-                return UNAUTH
-            payload = self.decode_token(token)
-            if payload is not None:
-                context.payload = payload
-                if sessions is not None and self.sessions_key is not None:
-                    sessions[self.sessions_key] = token
-                    return await next_filter()
-            return UNAUTH
-    return TokenAuthView
+#         async def auth_filter(self, context: Context, next_filter):
+#             """
+#             通过 Token 认证
+#             """
+#             if self.decode_token is None:
+#                 return await next_filter()
+#             sessions = context.sessions
+#             if sessions is not None and self.sessions_key is not None:
+#                 token = sessions.get(self.sessions_key, "")
+#             else:
+#                 headers = context.headers
+#                 token = headers.get("Authorization")
+#             if token is None:
+#                 return UNAUTH
+#             payload = self.decode_token(token)
+#             if payload is not None:
+#                 context.payload = payload
+#                 if sessions is not None and self.sessions_key is not None:
+#                     sessions[self.sessions_key] = token
+#                     return await next_filter()
+#             return UNAUTH
+#     return TokenAuthView
