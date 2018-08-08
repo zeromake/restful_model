@@ -3,9 +3,29 @@ services:
   mysql:
     image: mysql:8.0
     environment:
-        - MYSQL_USER=aiomysql
-        - MYSQL_PASSWORD=mypass
-        - MYSQL_DATABASE=test_pymysql
-        - MYSQL_ROOT_PASSWORD=mypass
+      - MYSQL_USER=aiomysql
+      - MYSQL_PASSWORD=mypass
+      - MYSQL_DATABASE=test_pymysql
+      - MYSQL_ROOT_PASSWORD=mypass
     ports:
-        - 3306:3306
+      - 3306:3306
+  pg:
+    image: postgres:10-alpine
+    environment:
+     - POSTGRES_USER=aiopg
+     - POSTGRES_PASSWORD=mypass
+     - POSTGRES_DB=test_pg
+    ports:
+     - 5432:5432
+  mariadb:
+    build: 
+      context: ./docker/mariadb
+      dockerfile: DockerFile
+    # image: mariadb:10.3
+    environment:
+      - MYSQL_USER=aiomysql
+      - MYSQL_PASSWORD=mypass
+      - MYSQL_DATABASE=test_pymysql
+      - MYSQL_ROOT_PASSWORD=mypass
+    ports:
+      - 3307:3306

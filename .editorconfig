@@ -8,6 +8,6 @@ charset = utf-8
 indent_style = space
 indent_size = 4
 
-[*.{html,xml,json,yaml,yal}]
+[*.{html,xml,json,yaml,yal,yml}]
 indent_style = space
 indent_size = 2

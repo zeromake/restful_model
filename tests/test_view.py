@@ -14,13 +14,6 @@ class ApiView(BaseView):
     __model__ = User
 
 
-async def build_db():
-    db_name = urlquote(":memory:")
-    db = DataBase("sqlite:///%s" % db_name, asyncio.get_event_loop())
-    db.engine = await db.create_engine(echo=True)
-    return db
-
-
 async def insert_user(api: "ApiView"):
     user1 = {
         "account": "test1",
@@ -48,12 +41,14 @@ async def insert_user(api: "ApiView"):
 
 
 @pytest.mark.asyncio
-async def test_view_query():
+async def test_view_query(db):
     """
     测试view的查询
     """
-    db = await build_db()
+    # db = await build_db()
     api = ApiView(db)
+    if await db.exists_table("user"):
+        await db.drop_table(User)
     await db.create_table(User)
     query_context = Context("get", "/user", {})
     assert repr(query_context).startswith("<Context ")
@@ -82,11 +77,14 @@ async def test_view_query():
         "message": "Query ok!",
         "data": [user1]
     } == await api.get(query_context, return_true)
+    await db.drop_table(User)
 
 
 @pytest.mark.asyncio
-async def test_view_create():
-    db = await build_db()
+async def test_view_create(db):
+    # db = await build_db()
+    if await db.exists_table("user"):
+        await db.drop_table(User)
     await db.create_table(User)
     api = ApiView(db)
     user1 =  await insert_user(api)
@@ -95,10 +93,14 @@ async def test_view_create():
     user2["account"] = "test2"
     user3["account"] = "test3"
     create_context2 = Context("post", "", {}, form_data=[user2, user3])
+    count = 2
+
+    # elif db.drivername() == "postgresql":
+    #     count = 0
     assert {
         "status": 201,
         "message": "Insert ok!",
-        "meta": {"count": 3}
+        "meta": {"count": count}
     } == await api.post(create_context2, return_true)
     user1["id"] = 1
     user2["id"] = 2
@@ -110,10 +112,14 @@ async def test_view_create():
         "data": [user1, user2, user3]
     } == await api.get(query_context, return_true)
 
+    await db.drop_table(User)
+
 
 @pytest.mark.asyncio
-async def test_view_delete():
-    db = await build_db()
+async def test_view_delete(db):
+    # db = await build_db()
+    if await db.exists_table("user"):
+        await db.drop_table(User)
     await db.create_table(User)
     api = ApiView(db)
     await insert_user(api)
@@ -129,11 +135,14 @@ async def test_view_delete():
         "message": "Query ok!",
         "data": []
     } == await api.get(query_context, return_true)
+    await db.drop_table(User)
 
 
 @pytest.mark.asyncio
-async def test_view_update():
-    db = await build_db()
+async def test_view_update(db):
+    # db = await build_db()
+    if await db.exists_table("user"):
+        await db.drop_table(User)
     await db.create_table(User)
     api = ApiView(db)
     user1 = await insert_user(api)
@@ -160,17 +169,22 @@ async def test_view_update():
         "message": "Query ok!",
         "data": [user2]
     } == await api.get(query_context, return_true)
-
+    count = 0
+    if db.drivername() in ("sqlite", "postgresql"):
+        count = 1
     assert {
         "status": 201,
         "message": "Update ok!",
-        "meta": {"count": 1}
+        "meta": {"count": count}
     } == await api.patch(put_context, return_true)
+    await db.drop_table(User)
 
 
 @pytest.mark.asyncio
-async def test_view_query2():
-    db = await build_db()
+async def test_view_query2(db):
+    # db = await build_db()
+    if await db.exists_table("user"):
+        await db.drop_table(User)
     await db.create_table(User)
     api = ApiView(db)
     user1 = await insert_user(api)
@@ -216,14 +230,17 @@ async def test_view_query2():
         "message": "Query ok!",
         "data": [user1],
     } == await api.dispatch_request(query_context3, return_true)
+    await db.drop_table(User)
 
 
 UNAUTH = {"status": 401, "message": "UNAUTH"}
 
 
 @pytest.mark.asyncio
-async def test_view_auth_filter():
-    db = await build_db()
+async def test_view_auth_filter(db):
+    # db = await build_db()
+    if await db.exists_table("user"):
+        await db.drop_table(User)
     await db.create_table(User)
     api = ApiView(db)
 
@@ -262,10 +279,13 @@ async def test_view_auth_filter():
         "status": 500,
         "message": "dispatch_request: self error",
     } == await api.dispatch_request(query_context, decorator_filter=True)
+    await db.drop_table(User)
 
 @pytest.mark.asyncio
-async def test_view_method_filter():
-    db = await build_db()
+async def test_view_method_filter(db):
+    # db = await build_db()
+    if await db.exists_table("user"):
+        await db.drop_table(User)
     await db.create_table(User)
     api = ApiView(db)
     api.__methods__ = {"post",}
@@ -285,10 +305,13 @@ async def test_view_method_filter():
         "status": 405,
         "message": "Method Not Allowed: gett",
     } == await api.dispatch_request(context)
+    await db.drop_table(User)
 
 @pytest.mark.asyncio
-async def test_view_keys_filter():
-    db = await build_db()
+async def test_view_keys_filter(db):
+    # db = await build_db()
+    if await db.exists_table("user"):
+        await db.drop_table(User)
     await db.create_table(User)
     api = ApiView(db)
     user1 = await insert_user(api)
@@ -316,3 +339,4 @@ async def test_view_keys_filter():
         "message": "Query ok!",
         "data": [user1],
     } == await api.dispatch_request(query_context)
+    await db.drop_table(User)

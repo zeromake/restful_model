@@ -89,7 +89,8 @@ class DataBase(object):
         """
         if conn is None:
             async with self.engine.acquire() as conn:
-                await conn.execute(self.create_table_sql(table))
+                async with conn.begin():
+                    await conn.execute(self.create_table_sql(table))
         else:
             await conn.execute(self.create_table_sql(table))
 
@@ -114,7 +115,8 @@ class DataBase(object):
         """
         if conn is None:
             async with self.engine.acquire() as conn:
-                return await conn.execute(self.drop_table_sql(table))
+                async with conn.begin():
+                    return await conn.execute(self.drop_table_sql(table))
         else:
             await conn.execute(self.drop_table_sql(table))
 
@@ -123,9 +125,10 @@ class DataBase(object):
         删除多个表
         """
         async with self.engine.acquire() as conn:
-            async with conn.begin() as transaction:
+            async with conn.begin():
                 for table in tables:
                     await conn.execute(self.drop_table_sql(table))
+
 
     async def exists_table(self, table_name: str, conn=None) -> bool:
         """
@@ -197,7 +200,15 @@ class DataBase(object):
             async with engine.acquire() as conn:
                 async with conn.begin():
                     async with conn.execute(sql) as cursor:
-                        return cursor.lastrowid, cursor.rowcount
+                        if cursor.rowcount > 1:
+                            return cursor.rowcount, 0
+                        if self._driver == "postgresql":
+                            return cursor.rowcount, (await cursor.first())[0] 
+                        return cursor.rowcount, cursor.lastrowid
         else:
             async with conn.execute(sql) as cursor:
-                return cursor.lastrowid, cursor.rowcount
+                if cursor.rowcount > 1:
+                    return cursor.rowcount, 0
+                if self._driver == "postgresql":
+                    return cursor.rowcount, (await cursor.first())[0]
+                return cursor.rowcount, cursor.lastrowid
