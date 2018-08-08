@@ -4,7 +4,7 @@ build:
 	python setup.py bdist_wheel
 	python setup.py bdist_egg
 
-test:
+cov:
 	pytest -s -vv --cov-report term --cov-report html --cov restful_model tests
 
 mypy:
