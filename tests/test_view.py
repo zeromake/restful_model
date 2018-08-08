@@ -5,9 +5,7 @@ import copy
 from datetime import datetime
 
 from .model import User
-from restful_model.view import BaseView
-from restful_model.context import Context
-from restful_model.database import DataBase
+from restful_model import BaseView, Context, DataBase
 from restful_model.utils import return_true
 from urllib.parse import quote_plus as urlquote
 
@@ -58,6 +56,7 @@ async def test_view_query():
     api = ApiView(db)
     await db.create_table(User)
     query_context = Context("get", "/user", {})
+    assert repr(query_context).startswith("<Context ")
     assert {
         "status": 200,
         "message": "Query ok!",
@@ -119,7 +118,7 @@ async def test_view_delete():
     api = ApiView(db)
     await insert_user(api)
     query_context = Context("get", "/user", {})
-    delete_context = Context("delete", "", {}, form_data={"id": 1})
+    delete_context = Context("delete", "", {}, form_data={"id": 1}, url_param={"id": 1})
     assert {
         "status": 200,
         "message": "Delete ok!",
@@ -217,3 +216,103 @@ async def test_view_query2():
         "message": "Query ok!",
         "data": [user1],
     } == await api.dispatch_request(query_context3, return_true)
+
+
+UNAUTH = {"status": 401, "message": "UNAUTH"}
+
+
+@pytest.mark.asyncio
+async def test_view_auth_filter():
+    db = await build_db()
+    await db.create_table(User)
+    api = ApiView(db)
+
+    async def auth_filter(context: "Context", next_handle):
+        return UNAUTH
+    api.auth_filter = auth_filter
+    query_context = Context("get", "/user", {})
+    assert UNAUTH == await api.dispatch_request(query_context, decorator_filter=True)
+    assert {
+        "status": 200,
+        "message": "Query ok!",
+        "data": [],
+    } == await api.dispatch_request(query_context, decorator_filter=False)
+    del api.auth_filter
+    assert {
+        "status": 200,
+        "message": "Query ok!",
+        "data": [],
+    } == await api.dispatch_request(query_context, decorator_filter=True)
+    api.get_filter = auth_filter
+    assert UNAUTH == await api.dispatch_request(query_context, decorator_filter=True)
+    assert {
+        "status": 200,
+        "message": "Query ok!",
+        "data": [],
+    } == await api.dispatch_request(query_context, decorator_filter=False)
+
+    self_error = TypeError("self error")
+
+    async def try_error(context, next_handle):
+        raise self_error
+
+    api.auth_filter = try_error
+    # with pytest.raises(self_error):
+    assert {
+        "status": 500,
+        "message": "dispatch_request: self error",
+    } == await api.dispatch_request(query_context, decorator_filter=True)
+
+@pytest.mark.asyncio
+async def test_view_method_filter():
+    db = await build_db()
+    await db.create_table(User)
+    api = ApiView(db)
+    api.__methods__ = {"post",}
+    query_context = Context("get", "/user", {})
+    assert {
+        "status": 405,
+        "message": "Method Not Allowed: get",
+    } == await api.dispatch_request(query_context, method_filter=True)
+    assert {
+        "status": 200,
+        "message": "Query ok!",
+        "data": [],
+    } == await api.raw_dispatch_request(query_context)
+    del api.__methods__
+    context = Context("gett", "/user", {})
+    assert {
+        "status": 405,
+        "message": "Method Not Allowed: gett",
+    } == await api.dispatch_request(context)
+
+@pytest.mark.asyncio
+async def test_view_keys_filter():
+    db = await build_db()
+    await db.create_table(User)
+    api = ApiView(db)
+    user1 = await insert_user(api)
+
+    api.__filter_keys__ = ["id"]
+
+    query_context = Context("get", "/user", {})
+
+    assert {
+        "status": 200,
+        "message": "Query ok!",
+        "data": [user1],
+    } == await api.dispatch_request(query_context)
+    user1["id"] = 1
+    assert {
+        "status": 200,
+        "message": "Query ok!",
+        "data": [user1],
+    } == await api.dispatch_request(query_context, key_filter=False)
+    api.__filter_keys__ = {"get": ["id"]}
+    api.cache = {}
+    del user1["id"]
+    assert {
+        "status": 200,
+        "message": "Query ok!",
+        "data": [user1],
+    } == await api.dispatch_request(query_context)

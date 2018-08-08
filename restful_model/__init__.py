@@ -10,4 +10,6 @@ restful_model is a `sqlalchemy`_ auto generate REATful API
 
 __version__ = "0.0.1"
 
+from .context import Context
 from .database import DataBase
+from .view import BaseView

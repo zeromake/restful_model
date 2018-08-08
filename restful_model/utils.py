@@ -8,6 +8,7 @@ filter_list_type = Union[List[str], Set[str], None]
 
 LOGGER = logging.getLogger(__package__)
 POSTGRE_TO_MYSQL = {}
+UPDATE_NOT_VALUES = TypeError("update not has values")
 
 
 def return_true(*args):
@@ -168,8 +169,8 @@ def update_sql(model: sa.Table, data, filter_list=return_true, where_filter=retu
     where = data.get("where")
     where_data = handle_where_param(model.columns, where, where_filter)
     values = data.get("values")
-    if not values:
-        raise TypeError("update not has values")
+    if values is None:
+        raise UPDATE_NOT_VALUES
     values_data = {}
     for key, val in values.items():
         if key in model.columns and filter_list(key):
@@ -192,7 +193,7 @@ def update_sql(model: sa.Table, data, filter_list=return_true, where_filter=retu
     else:
         sql = model.update()
     if len(values_data) == 0:
-        raise TypeError("update not has values")
+        raise UPDATE_NOT_VALUES
     return sql.values(values_data)
 
 
@@ -228,18 +229,18 @@ def handle_keys(columns, keys, filter_list, drivername):
             column_name = key.get("column")
             if column_name in columns and filter_list(column_name):
                 column = columns[column_name]
-                if drivername == "sqlite":
-                    if func_name == "from_unixtime":
-                        func_name = "strftime"
-                        format_str = args[0].replace(r"%i", r"%M")
-                        args = [format_str, "$column", "unixepoch"]
-                    elif func_name == "date_format":
-                        func_name = "strftime"
-                        format_str = args[0].replace(r"%i", r"%M")
-                        args = [format_str, "$column"]
-                elif drivername == "postgresql":
-                    if func_name == "from_unixtime":
-                        func_name = "to_char"
+                # if drivername == "sqlite":
+                #     if func_name == "from_unixtime":
+                #         func_name = "strftime"
+                #         format_str = args[0].replace(r"%i", r"%M")
+                #         args = [format_str, "$column", "unixepoch"]
+                #     elif func_name == "date_format":
+                #         func_name = "strftime"
+                #         format_str = args[0].replace(r"%i", r"%M")
+                #         args = [format_str, "$column"]
+                # elif drivername == "postgresql":
+                #     if func_name == "from_unixtime":
+                #         func_name = "to_char"
 
                 if func_name and hasattr(sa.func, func_name):
                     func = getattr(sa.func, func_name)

@@ -5,7 +5,7 @@ import sqlalchemy as sa
 from sqlalchemy.sql.expression import bindparam
 from urllib.parse import quote_plus as urlquote, unquote_plus
 from datetime import datetime, timezone, timedelta
-from restful_model.database import DataBase
+from restful_model import DataBase
 from restful_model.utils import model_to_dict
 from .model import User
 

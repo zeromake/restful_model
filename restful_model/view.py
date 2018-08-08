@@ -213,13 +213,14 @@ class BaseView(object):
                     return await handle(context, filter_keys)
                 else:
                     return await handle(context, next_handle)
-    
+
             return await next_handle()
         except Exception as e:
             LOGGER.error("view.BaseView.dispatch_request Error", exc_info=e)
+            error = str(e)
             return {
                 "status": 500,
-                "message": "dispatch_request: " + str(e),
+                "message": "dispatch_request: " + error,
             }
 
     def generate_filter(self, method, decorator_filter):

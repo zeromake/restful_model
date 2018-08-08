@@ -98,7 +98,7 @@ class DataBase(object):
         创建多个表
         """
         async with self.engine.acquire() as conn:
-            async with conn.begin() as transaction:
+            async with conn.begin():
                 for table in tables:
                     return await conn.execute(self.create_table_sql(table))
     
@@ -148,28 +148,28 @@ class DataBase(object):
             first = await result.first()
         return first != None
 
-    async def get_last_id(self, key="id", conn=None, cursor=None):
-        """
-        获取最后的id, pg需要传入cursor
-        """
-        sql = None
-        if self._driver == "sqlite":
-            sql = "SELECT last_insert_rowid() as id"
-        elif self._driver == "mysql":
-            sql = "SELECT LAST_INSERT_ID() as id"
-        elif self._driver == "postgresql":
-            if cursor is not None:
-                result = await cursor.first()
-                if not result is None:
-                    return result[0]
-        if sql:
-            if conn is None:
-                async with self.engine.acquire() as conn:
-                    cursor = await conn.execute(sql)
-                    return getattr((await cursor.first()), key)
-            else:
-                cursor = await conn.execute(sql)
-                return getattr((await cursor.first()), key)
+    # async def get_last_id(self, key="id", conn=None, cursor=None):
+    #     """
+    #     获取最后的id, pg需要传入cursor
+    #     """
+    #     sql = None
+    #     if self._driver == "sqlite":
+    #         sql = "SELECT last_insert_rowid() as id"
+    #     elif self._driver == "mysql":
+    #         sql = "SELECT LAST_INSERT_ID() as id"
+    #     elif self._driver == "postgresql":
+    #         if cursor is not None:
+    #             result = await cursor.first()
+    #             if not result is None:
+    #                 return result[0]
+    #     if sql:
+    #         if conn is None:
+    #             async with self.engine.acquire() as conn:
+    #                 cursor = await conn.execute(sql)
+    #                 return getattr((await cursor.first()), key)
+    #         else:
+    #             cursor = await conn.execute(sql)
+    #             return getattr((await cursor.first()), key)
 
     async def execute_dml(self, sql, data=None, conn=None):
         """
@@ -199,6 +199,5 @@ class DataBase(object):
                     async with conn.execute(sql) as cursor:
                         return cursor.lastrowid, cursor.rowcount
         else:
-            async with conn.begin():
-                async with conn.execute(sql) as cursor:
-                    return cursor.lastrowid, cursor.rowcount
+            async with conn.execute(sql) as cursor:
+                return cursor.lastrowid, cursor.rowcount

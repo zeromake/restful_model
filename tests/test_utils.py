@@ -1,3 +1,5 @@
+import pytest
+
 from restful_model.utils import (
     get_filter_list,
     handle_param,
@@ -439,6 +441,7 @@ def test_delete_sql() -> None:
     """
     assert assert_param(delete_sql(User, {"id": 1}), User.delete().where(User.c.id==1))
     assert not assert_param(delete_sql(User, {"id": 2}), User.delete().where(User.c.id==1))
+    assert assert_param(delete_sql(User, {}), User.delete())
 
 def test_select_sql() -> None:
     """
@@ -548,6 +551,50 @@ def test_select_sql() -> None:
             .where(User.c.id==1)
     )
 
+def test_select_func():
+    sql = select_sql(
+        User,
+        {},
+        keys=[
+            "id",
+            {"column": "id", "func": "count", "label": "count", "args": ["$column"]},
+            [],
+        ],
+        orders=["count"],
+        group=["count"],
+    )
+    assert_param(
+        sql,
+        sa.sql.select(
+            [User.c.id, sa.func.count(User.c.id).label("count")]
+        ).order_by("count").group_by("count")
+    )
+    keys = [
+		"id",
+		{
+			"column": "create_time",
+			"func": "from_unixtime",
+			"args": [
+                "$column",
+				"%Y-%m-%d %H:%i:%S"
+			],
+			"label": "ctime"
+		}
+	]
+    sql = select_sql(
+        User,
+        {},
+        keys=keys,
+    )
+    assert_param(
+        sql,
+        sa.sql.select([
+            User.c.id,
+            sa.func.from_uxixtime(User.c.create_time).label("ctime")
+        ])
+    )
+
+
 def test_update_sql():
     """
     测试更新语句
@@ -595,3 +642,23 @@ def test_update_sql():
         User.update().values({"account": bindparam("account1")})
     )
 
+
+def test_update_error():
+    with pytest.raises(TypeError):
+        update_sql(User, {})
+
+    with pytest.raises(TypeError):
+        update_sql(User, {"values": {"gg": 1}})
+
+
+def test_update_incr():
+    sql = update_sql(User, {"values": {"account": "$incr.-1", "email": 1}})
+    assert assert_param(
+        sql,
+        User.update().values({"account": User.c.account - 1, "email": 1})
+    )
+    sql = update_sql(User, {"values": {"account": "$incr.1", "email": 1}})
+    assert assert_param(
+        sql,
+        User.update().values({"account": User.c.account + 1, "email": 1})
+    )
