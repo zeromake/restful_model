@@ -1,8 +1,9 @@
 import logging
 import sqlalchemy as sa
-from sqlalchemy.sql import dml, ddl
+from sqlalchemy.sql import dml
 from sqlalchemy.sql.expression import bindparam
 from typing import Union, List, Set
+
 
 filter_list_type = Union[List[str], Set[str], None]
 
@@ -14,7 +15,11 @@ UPDATE_NOT_VALUES = TypeError("update not has values")
 def return_true(*args):
     return True
 
-def get_filter_list(block_list: filter_list_type=None, white_list: filter_list_type=None):
+
+def get_filter_list(
+        block_list: filter_list_type=None,
+        white_list: filter_list_type=None
+        ):
     """
     生成过滤黑白名单
     """
@@ -24,7 +29,7 @@ def get_filter_list(block_list: filter_list_type=None, white_list: filter_list_t
         block_list = set(block_list)
     if white_list and isinstance(white_list, list):
         white_list = set(white_list)
-    
+
     def filter_list(key: str) -> bool:
         """
         过滤黑白名单
@@ -37,6 +42,7 @@ def get_filter_list(block_list: filter_list_type=None, white_list: filter_list_t
         return status
     return filter_list
 
+
 def handle_param(column, data):
     """
     处理where条件
@@ -44,19 +50,19 @@ def handle_param(column, data):
     opt = data.get('opt', '$te')
     if 'val' in data:
         value = data['val']
-        if opt == '$ne': # 不等于
+        if opt == '$ne':  # 不等于
             return column != value
-        if opt == '$te': # 等于
+        if opt == '$te':  # 等于
             return column == value
-        elif opt == '$lt': # 小于
+        elif opt == '$lt':  # 小于
             return column < value
-        elif opt == '$lte': # 小于等于
+        elif opt == '$lte':  # 小于等于
             return column <= value
-        elif opt == '$gt': # 大于
+        elif opt == '$gt':  # 大于
             return column > value
-        elif opt == '$gte': # 大于等于
+        elif opt == '$gte':  # 大于等于
             return column >= value
-        elif opt == '$like': # like
+        elif opt == '$like':  # like
             return column.like(value)
         elif opt == '$in':
             return column.in_(value)
@@ -87,6 +93,7 @@ def handle_param(column, data):
         elif opt == '$raw':
             return value
 
+
 def handle_param_desc(column, data):
     """
     处理参数类型
@@ -96,14 +103,14 @@ def handle_param_desc(column, data):
         if len(data) > 0:
             for row in data:
                 param = handle_param(column, row)
-                if not param is None:
+                if param is not None:
                     params.append(param)
     elif isinstance(data, dict):
         param = handle_param(column, data)
         if param is not None:
             params.append(param)
     else:
-        params.append(column==data)
+        params.append(column == data)
     # 结合为一个 where 参数
     params_len = len(params)
     if params_len == 1:
@@ -111,7 +118,13 @@ def handle_param_desc(column, data):
     elif params_len > 1:
         return sa.and_(*params)
 
-def handle_where_param(column_name, form_data, filter_list=return_true, is_or=False):
+
+def handle_where_param(
+        column_name,
+        form_data,
+        filter_list=return_true,
+        is_or=False
+        ):
     """
     处理带主键的参数
     """
@@ -121,8 +134,13 @@ def handle_where_param(column_name, form_data, filter_list=return_true, is_or=Fa
     for key, val in form_data.items():
         if key == "$or" or key == "$and":
             # 递归处理新的where, 让 or 内部支持 and 嵌套
-            params = handle_where_param(column_name, val, filter_list, key == "$or")
-            if not params is None:
+            params = handle_where_param(
+                column_name,
+                val,
+                filter_list,
+                key == "$or"
+            )
+            if params is not None:
                 data.append(params)
         elif key in column_name and filter_list(key):
             # 在表中且不被名单过滤
@@ -138,15 +156,17 @@ def handle_where_param(column_name, form_data, filter_list=return_true, is_or=Fa
     elif data_len > 1:
         return sa.or_(*data) if is_or else sa.and_(*data)
 
+
 def insert_sql(model: sa.Table, data, filter_list=return_true) -> dml.Insert:
     """
     生成插入语句对象
     """
     if isinstance(data, list):
-        data = [{ k: v for k, v in m.items() if filter_list(k) } for m in data]
+        data = [{k: v for k, v in m.items() if filter_list(k)} for m in data]
     else:
-        data = { k: v for k, v in data.items() if filter_list(k) }
+        data = {k: v for k, v in data.items() if filter_list(k)}
     return model.insert().values(data)
+
 
 def delete_sql(model: sa.Table, data, filter_list=return_true) -> dml.Delete:
     """
@@ -157,7 +177,13 @@ def delete_sql(model: sa.Table, data, filter_list=return_true) -> dml.Delete:
         return model.delete().where(where_data)
     return model.delete()
 
-def update_sql(model: sa.Table, data, filter_list=return_true, where_filter=return_true) -> dml.Update:
+
+def update_sql(
+            model: sa.Table,
+            data,
+            filter_list=return_true,
+            where_filter=return_true
+        ) -> dml.Update:
     """
     生成更新语句对象
     """
@@ -285,7 +311,9 @@ def select_sql(
     if keys:
         columns = handle_keys(model.columns, keys, filter_list, drivername)
     else:
-        columns = [column for column in model.columns if filter_list(column.name)]
+        columns = [
+            column for column in model.columns if filter_list(column.name)
+        ]
     sql = sa.sql.select(columns)
     if where_data is not None:
         sql = sql.where(where_data)

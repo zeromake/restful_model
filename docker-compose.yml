@@ -21,7 +21,6 @@ services:
     build: 
       context: ./docker/mariadb
       dockerfile: DockerFile
-    # image: mariadb:10.3
     environment:
       - MYSQL_USER=aiomysql
       - MYSQL_PASSWORD=mypass

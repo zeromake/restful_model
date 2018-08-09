@@ -1,15 +1,16 @@
 import logging
 import asyncio
 import pytest
-import sqlalchemy as sa
+# import sqlalchemy as sa
 from sqlalchemy.sql.expression import bindparam
-from urllib.parse import quote_plus as urlquote, unquote_plus
 from datetime import datetime, timezone, timedelta
 from restful_model import DataBase
 from restful_model.utils import model_to_dict
 from .model import User
 
+
 logging.basicConfig(level=logging.DEBUG)
+
 
 def to_timestamp(obj: datetime) -> int:
     """
@@ -17,11 +18,13 @@ def to_timestamp(obj: datetime) -> int:
     """
     return int(obj.timestamp())
 
+
 def get_offset_timestamp(**kwargs) -> int:
     """
     获取偏移时间戳
     """
     return to_timestamp(datetime.now(timezone.utc) + timedelta(**kwargs))
+
 
 @pytest.mark.asyncio
 async def test_create_engine(data_bese, db_name) -> None:
@@ -61,9 +64,7 @@ async def test_create_engine(data_bese, db_name) -> None:
 
 @pytest.mark.asyncio
 async def test_execute_sql(data_bese) -> None:
-    # db = urlquote(":memory:")
     data = DataBase(data_bese, asyncio.get_event_loop())
-    # data = DataBase("mysql+pymysql://aiomysql:mypass@127.0.0.1:3306/test_pymysql", asyncio.get_event_loop())
     data.engine = await data.create_engine(echo=True)
     if await data.exists_table("user"):
         await data.drop_table(User)
@@ -96,7 +97,6 @@ async def test_execute_sql(data_bese) -> None:
             async with conn.execute(sql) as cursor:
                 user1["id"] = 2
                 assert user1 == model_to_dict(await cursor.first())
-            
             sql = User.select().where(User.c.id == 3)
             async with conn.execute(sql) as cursor:
                 user2["id"] = 3
@@ -104,7 +104,10 @@ async def test_execute_sql(data_bese) -> None:
             sql1 = User.update().where(User.c.id == bindparam("id")).values({
                 "account": bindparam("account"),
             })
-            async with conn.execute(sql1, {"id": 1, "account": "gggg"}) as cursor:
+            async with conn.execute(
+                sql1,
+                {"id": 1, "account": "gggg"}
+            ) as cursor:
                 assert 1 == cursor.rowcount
             sql = User.select().where(User.c.id == 1)
             async with conn.execute(sql) as cursor:
@@ -112,7 +115,13 @@ async def test_execute_sql(data_bese) -> None:
                 user1["account"] = "gggg"
                 assert user1 == model_to_dict(await cursor.first())
             if data.drivername == "sqlite":
-                async with conn.execute(sql1, [{"id": 1, "account": "test5"}, {"id": 2, "account": "test6"}] ) as cursor:
+                async with conn.execute(
+                    sql1,
+                    [
+                        {"id": 1, "account": "test5"},
+                        {"id": 2, "account": "test6"},
+                    ]
+                ) as cursor:
                     assert 2 == cursor.rowcount
                 sql = User.select().where(User.c.id < 3)
                 async with conn.execute(sql) as cursor:

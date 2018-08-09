@@ -1,13 +1,11 @@
 import pytest
-import asyncio
 import copy
 
 from datetime import datetime
 
 from .model import User
-from restful_model import BaseView, Context, DataBase
+from restful_model import BaseView, Context
 from restful_model.utils import return_true
-from urllib.parse import quote_plus as urlquote
 
 
 class ApiView(BaseView):
@@ -87,7 +85,7 @@ async def test_view_create(db):
         await db.drop_table(User)
     await db.create_table(User)
     api = ApiView(db)
-    user1 =  await insert_user(api)
+    user1 = await insert_user(api)
     user2 = copy.copy(user1)
     user3 = copy.copy(user1)
     user2["account"] = "test2"
@@ -124,7 +122,13 @@ async def test_view_delete(db):
     api = ApiView(db)
     await insert_user(api)
     query_context = Context("get", "/user", {})
-    delete_context = Context("delete", "", {}, form_data={"id": 1}, url_param={"id": 1})
+    delete_context = Context(
+        "delete",
+        "",
+        {},
+        form_data={"id": 1},
+        url_param={"id": 1}
+    )
     assert {
         "status": 200,
         "message": "Delete ok!",
@@ -208,8 +212,16 @@ async def test_view_query2(db):
                 'limit': 10
             }
         }
-    } == await api.dispatch_request(query_context2, return_true)
-    query_context3 = Context("get", "/user", {}, args={"limit": ["[0, 10]"], "order": ["00000"]})
+    } == await api.dispatch_request(
+        query_context2,
+        return_true
+    )
+    query_context3 = Context(
+        "get",
+        "/user",
+        {},
+        args={"limit": ["[0, 10]"], "order": ["00000"]}
+    )
     assert {
         "status": 200,
         "message": "Query ok!",
@@ -248,25 +260,40 @@ async def test_view_auth_filter(db):
         return UNAUTH
     api.auth_filter = auth_filter
     query_context = Context("get", "/user", {})
-    assert UNAUTH == await api.dispatch_request(query_context, decorator_filter=True)
+    assert UNAUTH == await api.dispatch_request(
+        query_context,
+        decorator_filter=True
+    )
     assert {
         "status": 200,
         "message": "Query ok!",
         "data": [],
-    } == await api.dispatch_request(query_context, decorator_filter=False)
+    } == await api.dispatch_request(
+        query_context,
+        decorator_filter=False
+    )
     del api.auth_filter
     assert {
         "status": 200,
         "message": "Query ok!",
         "data": [],
-    } == await api.dispatch_request(query_context, decorator_filter=True)
+    } == await api.dispatch_request(
+        query_context,
+        decorator_filter=True
+    )
     api.get_filter = auth_filter
-    assert UNAUTH == await api.dispatch_request(query_context, decorator_filter=True)
+    assert UNAUTH == await api.dispatch_request(
+        query_context,
+        decorator_filter=True
+    )
     assert {
         "status": 200,
         "message": "Query ok!",
         "data": [],
-    } == await api.dispatch_request(query_context, decorator_filter=False)
+    } == await api.dispatch_request(
+        query_context,
+        decorator_filter=False
+    )
 
     self_error = TypeError("self error")
 
@@ -281,6 +308,7 @@ async def test_view_auth_filter(db):
     } == await api.dispatch_request(query_context, decorator_filter=True)
     await db.drop_table(User)
 
+
 @pytest.mark.asyncio
 async def test_view_method_filter(db):
     # db = await build_db()
@@ -288,7 +316,7 @@ async def test_view_method_filter(db):
         await db.drop_table(User)
     await db.create_table(User)
     api = ApiView(db)
-    api.__methods__ = {"post",}
+    api.__methods__ = {"post"}
     query_context = Context("get", "/user", {})
     assert {
         "status": 405,
@@ -306,6 +334,7 @@ async def test_view_method_filter(db):
         "message": "Method Not Allowed: gett",
     } == await api.dispatch_request(context)
     await db.drop_table(User)
+
 
 @pytest.mark.asyncio
 async def test_view_keys_filter(db):

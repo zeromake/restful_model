@@ -52,6 +52,7 @@ async def tornado_dispatch_request(self: "ApiView", *path_args, **kwargs):
     self.set_status(resp["status"])
     self.write(json.dumps(resp, ensure_ascii=False).encode("utf-8"))
 
+
 class ApiView(BaseView):
 
     @classmethod
@@ -60,6 +61,7 @@ class ApiView(BaseView):
         生成请求响应类
         """
         obj = cls(*args, **kwargs)
+
         class ApiHandler(tornado.web.RequestHandler):
             get = tornado_dispatch_request
             post = tornado_dispatch_request

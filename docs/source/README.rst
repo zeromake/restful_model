@@ -9,6 +9,21 @@ restful_model
     :target: https://codecov.io/gh/zeromake/restful_model
     :alt: codecov
 
+.. image:: https://badge.fury.io/py/restful_model.svg
+    :target: https://pypi.org/project/restful_model/
+    :alt: Latest Version
+
+.. image:: https://img.shields.io/pypi/l/restful_model.svg
+    :target: https://github.com/zeromake/restful_model/blob/master/LICENSE
+    :alt: PyPI - License
+
+.. image:: https://img.shields.io/pypi/format/restful_model.svg
+    :target: https://pypi.org/project/restful_model/#files
+    :alt: PyPI - Format
+
+.. image:: https://img.shields.io/pypi/pyversions/restful_model.svg
+    :alt: PyPI - PyVersions
+
 
 restful_model is an `sqlalchemy`_ auto generate REATful API
 

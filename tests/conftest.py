@@ -4,6 +4,7 @@ import asyncio
 from restful_model import DataBase
 from urllib.parse import unquote_plus
 
+
 @pytest.fixture(scope='session')
 def event_loop():
     loop_obj = asyncio.new_event_loop()
@@ -19,6 +20,7 @@ def loop(event_loop):
     """
     return event_loop
 
+
 @pytest.fixture(scope="session")
 def db_name():
     # pg
@@ -27,6 +29,7 @@ def db_name():
     # return "test_pymysql"
     # sqlite
     return ":memory:"
+
 
 @pytest.fixture(scope="session")
 def data_bese(db_name):
@@ -39,6 +42,7 @@ def data_bese(db_name):
     # sqlite
     db_name = unquote_plus(db_name)
     return "sqlite:///%s" % db_name
+
 
 @pytest.fixture
 def db(loop, data_bese):

@@ -8,6 +8,7 @@ __all__ = ["ApiView"]
 
 class ApiView(BaseView):
     decorators = None
+
     async def sanic_dispatch_request(self, request, *args, **kwargs):
         session = request["session"] if "session" in request else None
         content = Context(
@@ -33,7 +34,11 @@ class ApiView(BaseView):
                 elif isinstance(i, dict):
                     h = i
             return response.json(res, headers=h, status=status)
-        return response.json(resp, headers={"Content-Type": "application/json;charset=utf-8"}, status=resp["status"])
+        return response.json(
+            resp,
+            headers={"Content-Type": "application/json;charset=utf-8"},
+            status=resp["status"],
+        )
 
     @classmethod
     def as_view(cls, *class_args, **class_kwargs):
@@ -41,8 +46,10 @@ class ApiView(BaseView):
         创建一个对象
         """
         self = cls(*class_args, **class_kwargs)
+
         async def view(*args, **kwargs):
             return await self.sanic_dispatch_request(*args, **kwargs)
+
         if cls.decorators:
             view.__module__ = cls.__module__
             for decorator in cls.decorators:

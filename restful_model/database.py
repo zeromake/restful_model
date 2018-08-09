@@ -24,7 +24,7 @@ class DataBase(object):
         self.loop = cast(asyncio.AbstractEventLoop, loop)
         # self._tables = tables
         self.engine = None
-    
+
     def drivername(self):
         return self._driver
 
@@ -102,7 +102,7 @@ class DataBase(object):
             async with conn.begin():
                 for table in tables:
                     return await conn.execute(self.create_table_sql(table))
-    
+
     def drop_table_sql(self, table: 'sa.Table') -> DropTable:
         """
         生成删除表的sql语句
@@ -129,19 +129,23 @@ class DataBase(object):
                 for table in tables:
                     await conn.execute(self.drop_table_sql(table))
 
-
     async def exists_table(self, table_name: str, conn=None) -> bool:
         """
         手动使用各个数据库的专有 sql 查询 table 是否存在
         """
         sql = None
         if self._driver == "sqlite":
-            sql = "SELECT name FROM sqlite_master where type='table' and name='%s'" % table_name
+            sql = "SELECT name FROM sqlite_master "\
+                "where type='table' and name='%s'" % table_name
         elif self._driver == "mysql":
             sql = "SELECT TABLE_NAME FROM information_schema.TABLES "\
-            "WHERE TABLE_NAME ='%s' AND TABLE_SCHEMA = '%s'" % (table_name, self._url.database)
+                "WHERE TABLE_NAME ='%s' AND TABLE_SCHEMA = '%s'" % (
+                    table_name,
+                    self._url.database
+                )
         elif self._driver == "postgresql":
-            sql = "SELECT relname FROM pg_class WHERE relname = '%s'" % table_name
+            sql = "SELECT relname FROM "\
+                "pg_class WHERE relname = '%s'" % table_name
         if conn is None:
             async with self.engine.acquire() as conn:
                 result = await conn.execute(sql)
@@ -149,7 +153,7 @@ class DataBase(object):
         else:
             result = await conn.execute(sql)
             first = await result.first()
-        return first != None
+        return first is not None
 
     # async def get_last_id(self, key="id", conn=None, cursor=None):
     #     """
@@ -203,7 +207,7 @@ class DataBase(object):
                         if cursor.rowcount > 1:
                             return cursor.rowcount, 0
                         if self._driver == "postgresql":
-                            return cursor.rowcount, (await cursor.first())[0] 
+                            return cursor.rowcount, (await cursor.first())[0]
                         return cursor.rowcount, cursor.lastrowid
         else:
             async with conn.execute(sql) as cursor:

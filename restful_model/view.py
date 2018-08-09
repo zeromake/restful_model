@@ -1,4 +1,3 @@
-import base64
 import json
 
 from .database import DataBase
@@ -21,6 +20,7 @@ UNAUTH = {
     "message": "Default Unauthorized",
 }
 
+
 class BaseView(object):
     """
     基本视图
@@ -28,7 +28,6 @@ class BaseView(object):
     __model__ = None
     __methods__ = None
     __filter_keys__ = None
-
 
     """
     通用请求响应处理器
@@ -151,14 +150,6 @@ class BaseView(object):
             },
         }
 
-    # async def patch(self, context: Context, filter_keys):
-    #     """
-    #     更新
-    #     """
-    #     return await self.put(context, filter_keys)
-    # async def options(self, context, filter_keys):
-        # return {}, {"Access-Control-Allow-Methods", ", ".join([m.upper() for m in self.__methods__])}
-
     async def dispatch_request(
         self,
         context: Context,
@@ -175,18 +166,24 @@ class BaseView(object):
                 try:
                     for k in QUERY_ARGS:
                         if k in context.args:
-                            context.form_data[k] = json.loads(context.args[k][0])
+                            context.form_data[k] = json.loads(
+                                context.args[k][0]
+                            )
                 except Exception:
                     pass
             if "method" in context.args:
                 method = context.args["method"][0]
-        if method_filter and self.__methods__ is not None and method not in self.__methods__:
+        flag = method_filter and self.__methods__ is not None
+        if flag and method not in self.__methods__:
             return {
                 "status": 405,
                 "message": "Method Not Allowed: %s" % method,
             }
         try:
-            decorator_filters = self.generate_filter(method, decorator_filter)
+            decorator_filters = self.generate_filter(
+                method,
+                decorator_filter
+            )
             filter_keys = return_true
             if key_filter:
                 if method in self.cache:
@@ -194,9 +191,13 @@ class BaseView(object):
                 else:
                     if self.__filter_keys__ is not None:
                         if isinstance(self.__filter_keys__, list):
-                            filter_keys = get_filter_list(*self.__filter_keys__)
+                            filter_keys = get_filter_list(
+                                *self.__filter_keys__
+                            )
                         elif method in self.__filter_keys__:
-                            filter_keys = get_filter_list(*self.__filter_keys__[method])
+                            filter_keys = get_filter_list(
+                                *self.__filter_keys__[method]
+                            )
                     self.cache[method] = filter_keys
 
             async def next_handle():
@@ -229,7 +230,7 @@ class BaseView(object):
 
         :param method: 请求方法
         :param decorator_filter: 是否进行过滤
-        :yield call: 
+        :yield call:
         """
         if decorator_filter:
             if hasattr(self, "auth_filter"):
@@ -283,7 +284,9 @@ class BaseView(object):
 #                 return UNAUTH
 #             auth_str = base64.decodestring(auth)
 #             name, pwd = auth_str.split(":")
-#             sql = self.auth_model.select().where(self.auth_model[self.name_key] == name)
+# sql = self.auth_model.select().where(
+#     self.auth_model[self.name_key] == name
+# )
 #             async with self.db.engine.acquire() as conn:
 #                 async with conn.execute(sql) as cursor:
 #                     row = await cursor.first()

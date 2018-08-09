@@ -18,7 +18,7 @@ setup(
     version=version,
     url='https://github.com/zeromake/restful_model',
     project_urls=OrderedDict((
-        # ('Documentation', ''),
+        ('Documentation', readme),
         ('Code', 'https://github.com/zeromake/restful_model'),
         ('Issue tracker', 'https://github.com/zeromake/restful_model/issues'),
     )),
@@ -38,7 +38,6 @@ setup(
         'Framework :: AsyncIO',
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python :: 3 :: Only',
-        'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: Implementation :: CPython',
         'Topic :: Software Development :: Libraries :: Application Frameworks',
