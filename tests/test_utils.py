@@ -733,6 +733,56 @@ def test_select_func():
             ).label("ctime")
         ])
     )
+    keys = [
+        "id",
+        "from_unixtime('$create_time', '%Y-%m-%d %H:%i:%S'):ctime"
+    ]
+    sql = select_sql(
+        User,
+        {},
+        keys=keys,
+    )
+    assert_param(
+        sql,
+        sa.sql.select([
+            User.c.id,
+            sa.func.from_uxixtime(
+                User.c.create_time,
+                "%Y-%m-%d %H:%i:%S"
+            ).label("ctime")
+        ])
+    )
+    keys = [
+        "id",
+        "from_unixtime('$create_time', '%Y-%m-%d %H:%i:%S', '$$'):ctime"
+    ]
+    sql = select_sql(
+        User,
+        {},
+        keys=keys,
+    )
+    assert_param(
+        sql,
+        sa.sql.select([
+            User.c.id,
+            sa.func.from_uxixtime(
+                User.c.create_time,
+                "%Y-%m-%d %H:%i:%S",
+                "$"
+            ).label("ctime")
+        ])
+    )
+    keys = [
+        "id",
+        "from_unixtime():ctime"
+    ]
+    sql = select_sql(
+        User,
+        {},
+        keys=keys,
+    )
+    # print("-----------------------------", sql)
+    # assert False
 
 
 def test_update_sql():

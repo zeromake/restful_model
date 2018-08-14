@@ -1,3 +1,4 @@
+import ast
 import logging
 import sqlalchemy as sa
 from sqlalchemy.sql import dml
@@ -245,6 +246,25 @@ def handle_orders(columns, orders, filter_list):
         return order_by
 
 
+def handle_func_args(columns, args, filter_list):
+    argv = []
+    flag = False
+    for arg in args:
+        if isinstance(arg, str) and arg[0] == "$":
+            if arg[1] == "$":
+                argv.append(arg[1:])
+                continue
+            column_name = arg[1:]
+            if column_name in columns and filter_list(column_name):
+                column = columns[column_name]
+                argv.append(column)
+                flag = True
+        else:
+            argv.append(arg)
+    if flag:
+        return argv
+
+
 def handle_keys(columns, keys, filter_list, drivername):
     res = []
     for key in keys:
@@ -287,8 +307,35 @@ def handle_keys(columns, keys, filter_list, drivername):
                 if label:
                     column = column.label(label)
                 res.append(column)
-        elif isinstance(key, str) and key in columns and filter_list(key):
-            res.append(columns[key])
+        elif isinstance(key, str):
+            column = None
+            label = None
+            label_start = key.rfind("):")
+            if label_start > -1:
+                label = key[label_start+2:].strip()
+                key = key[:label_start+1]
+            start = key.find("(")
+            if start > 0:
+                func_name = key[:start].strip()
+                end = key.rfind(")")
+                args_str = ast.literal_eval(key[start: end+1])
+                args = handle_func_args(
+                    columns,
+                    args_str,
+                    filter_list,
+                )
+                if args is not None and hasattr(sa.func, func_name):
+                    func = getattr(sa.func, func_name)
+                    column = func(*args)
+                else:
+                    LOGGER.warn("not parse key: %s" % key)
+                    continue
+            if column is None and key in columns and filter_list(key):
+                column = columns[key]
+            if column is not None:
+                if label is not None:
+                    column = column.label(label)
+                res.append(column)
         else:
             LOGGER.warn("utils.handle_keys: `%s` key not is str or dict", key)
     return res
