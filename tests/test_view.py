@@ -39,6 +39,14 @@ async def insert_user(api: "ApiView"):
 
 
 @pytest.mark.asyncio
+async def test_options(db):
+    """
+    测试options
+    """
+    api = ApiView(db)
+    assert ({}, 200) == await api.options(None)
+
+@pytest.mark.asyncio
 async def test_view_query(db):
     """
     测试view的查询
@@ -182,6 +190,17 @@ async def test_view_update(db):
         "meta": {"count": count}
     } == await api.patch(put_context, return_true)
     await db.drop_table(User)
+
+@pytest.mark.asyncio
+async def test_view_name(db):
+    api = ApiView(db)
+    assert api.name == User.name
+
+@pytest.mark.asyncio
+async def test_generate_sql(db):
+    api = ApiView(db)
+    query_context = Context("get", "/user", {})
+    await api.dispatch_request(query_context, generate_sql=True)
 
 
 @pytest.mark.asyncio

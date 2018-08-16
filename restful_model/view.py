@@ -1,4 +1,5 @@
 import json
+import asyncio
 
 from .database import DataBase
 from .utils import (
@@ -36,9 +37,17 @@ class BaseView(object):
         self.db = db
         self.cache = {}
 
-    async def get(self, context: Context, filter_keys):
+    @property
+    def name(self):
+        return self.model.name
+
+    @property
+    def model(self):
+        return self.__model__
+
+    def get_sql(self, context: Context, filter_keys):
         """
-        GET 查询请求的统一调用
+        分析请求生成sql
         """
         form_data = context.form_data
         keys = form_data.get("keys")
@@ -46,18 +55,26 @@ class BaseView(object):
         limit = form_data.get("limit")
         orders = form_data.get("order")
         group = form_data.get("group")
-        sql_count = None
-        if limit and not context.has_param:
-            sql, sql_count = select_sql(
-                self.__model__,
-                where,
-                filter_keys,
-                keys,
-                orders,
-                limit,
-                group,
-                self.db.drivername()
-            )
+        return select_sql(
+            self.model,
+            where,
+            filter_keys,
+            keys,
+            orders,
+            None if context.has_param else limit,
+            group,
+            self.db.drivername()
+        )
+
+    async def get(self, context: Context, filter_keys):
+        """
+        GET 查询请求的统一调用
+        """
+        form_data = context.form_data
+        limit = form_data.get("limit")
+        sql_arr = self.get_sql(context, filter_keys)
+        if isinstance(sql_arr, tuple):
+            sql, sql_count = sql_arr
             async with self.db.engine.acquire() as conn:
                 async with conn.execute(sql_count) as cursor:
                     total = (await cursor.first())._count
@@ -78,16 +95,7 @@ class BaseView(object):
                     }
                 }
         else:
-            sql = select_sql(
-                self.__model__,
-                where,
-                filter_keys,
-                keys,
-                orders,
-                limit,
-                group,
-                self.db.drivername()
-            )
+            sql = sql_arr
             async with self.db.engine.acquire() as conn:
                 async with conn.execute(sql) as cursor:
                     if context.has_param:
@@ -101,12 +109,18 @@ class BaseView(object):
                         'data': data
                     }
 
+    def post_sql(self, context: Context, filter_keys):
+        """
+        分析请求生成sql
+        """
+        form_data = context.form_data
+        return insert_sql(self.model, form_data, filter_keys)
+
     async def post(self, context: Context, filter_keys):
         """
         插入
         """
-        form_data = context.form_data
-        sql = insert_sql(self.__model__, form_data, filter_keys)
+        sql = self.post_sql(context, filter_keys)
         count, rowid = await self.db.execute_insert(sql)
         res = {
             'status': 201,
@@ -119,12 +133,18 @@ class BaseView(object):
             res["meta"]["rowid"] = rowid
         return res
 
+    def delete_sql(self, context: Context, filter_keys):
+        """
+        分析请求生成sql
+        """
+        form_data = context.form_data
+        return delete_sql(self.model, form_data, filter_keys)
+
     async def delete(self, context: Context, filter_keys):
         """
         删除
         """
-        form_data = context.form_data
-        sql = delete_sql(self.__model__, form_data, filter_keys)
+        sql = self.delete_sql(context, filter_keys)
         count = await self.db.execute_dml(sql)
         return {
             'status': 200,
@@ -140,7 +160,7 @@ class BaseView(object):
         """
         form_data = context.form_data
         data = form_data.get("data")
-        sql = update_sql(self.__model__, form_data, filter_keys)
+        sql = update_sql(self.model, form_data, filter_keys)
         count = await self.db.execute_dml(sql, data)
         return {
             'status': 201,
@@ -156,6 +176,7 @@ class BaseView(object):
         method_filter=True,
         decorator_filter=True,
         key_filter=True,
+        generate_sql=False,
     ):
         """
         分发请求
@@ -182,7 +203,8 @@ class BaseView(object):
         try:
             decorator_filters = self.generate_filter(
                 method,
-                decorator_filter
+                decorator_filter,
+                generate_sql,
             )
             filter_keys = return_true
             if key_filter:
@@ -205,15 +227,18 @@ class BaseView(object):
                 中间件模式
                 """
                 handle, ok = next(decorator_filters)
+                if handle is None:
+                    return {
+                        "status": 405,
+                        "message": "Method Not Allowed: %s" % method,
+                    }
                 if ok:
-                    if handle is None:
-                        return {
-                            "status": 405,
-                            "message": "Method Not Allowed: %s" % method,
-                        }
-                    return await handle(context, filter_keys)
+                    res = handle(context, filter_keys)
                 else:
-                    return await handle(context, next_handle)
+                    res = handle(context, next_handle)
+                if asyncio.iscoroutine(res):
+                    return await res
+                return res
 
             return await next_handle()
         except Exception as e:
@@ -224,7 +249,7 @@ class BaseView(object):
                 "message": "dispatch_request: " + error,
             }
 
-    def generate_filter(self, method, decorator_filter):
+    def generate_filter(self, method, decorator_filter, generate_sql=False):
         """
         把所有的方法都作为中间件处理
 
@@ -238,6 +263,8 @@ class BaseView(object):
             filter_method_name = method + "_filter"
             if hasattr(self, filter_method_name):
                 yield getattr(self, filter_method_name), False
+        if generate_sql:
+            method += "_sql"
         yield getattr(self, method, None), True
 
     async def raw_dispatch_request(self, context: Context):
