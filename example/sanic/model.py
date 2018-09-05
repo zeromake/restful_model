@@ -44,3 +44,29 @@ User = sa.Table(
     ),
     sqlite_autoincrement=True,
 )
+
+UserConfig = sa.Table(
+    'user_config',
+    metadata,
+    sa.Column(
+        'id',
+        sa.Integer,
+        autoincrement=True,
+        primary_key=True,
+        nullable=False,
+        doc="主键"
+    ),
+    sa.Column(
+        "user_id",
+        sa.Integer,
+        nullable=False,
+        doc="属于哪个用户",
+    ),
+    sa.Column(
+        "integral",
+        sa.BigInteger,
+        nullable=False,
+        doc="积分",
+    ),
+    sqlite_autoincrement=True,
+)

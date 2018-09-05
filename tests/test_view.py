@@ -21,19 +21,21 @@ async def insert_user(api: "ApiView"):
         "create_time": int(datetime.now().timestamp()),
     }
     create_context = Context("post", "", {}, form_data=user1)
+    create_context.filter_keys = return_true
     assert {
         "status": 201,
         "message": "Insert ok!",
         "meta": {"count": 1, "rowid": 1}
-    } == await api.post(create_context, return_true)
+    } == await api.post(create_context)
     # context = Context("get", "/user", {})
     user1["id"] = 1
     query_context = Context("get", "/user", {})
+    query_context.filter_keys = return_true
     assert {
         "status": 200,
         "message": "Query ok!",
         "data": [user1]
-    } == await api.get(query_context, return_true)
+    } == await api.get(query_context)
     del user1["id"]
     return user1
 
@@ -46,6 +48,7 @@ async def test_options(db):
     api = ApiView(db)
     assert ({}, 200) == await api.options(None)
 
+
 @pytest.mark.asyncio
 async def test_view_query(db):
     """
@@ -57,12 +60,13 @@ async def test_view_query(db):
         await db.drop_table(User)
     await db.create_table(User)
     query_context = Context("get", "/user", {})
+    query_context.filter_keys = return_true
     assert repr(query_context).startswith("<Context ")
     assert {
         "status": 200,
         "message": "Query ok!",
         "data": []
-    } == await api.get(query_context, return_true)
+    } == await api.get(query_context)
     user1 = {
         "account": "test1",
         "email": "test1@test.com",
@@ -71,18 +75,19 @@ async def test_view_query(db):
         "create_time": int(datetime.now().timestamp()),
     }
     create_context = Context("post", "", {}, form_data=user1)
+    create_context.filter_keys = return_true
     assert {
         "status": 201,
         "message": "Insert ok!",
         "meta": {"count": 1, "rowid": 1}
-    } == await api.post(create_context, return_true)
+    } == await api.post(create_context)
     # context = Context("get", "/user", {})
     user1["id"] = 1
     assert {
         "status": 200,
         "message": "Query ok!",
         "data": [user1]
-    } == await api.get(query_context, return_true)
+    } == await api.get(query_context)
     await db.drop_table(User)
 
 
@@ -100,23 +105,24 @@ async def test_view_create(db):
     user3["account"] = "test3"
     create_context2 = Context("post", "", {}, form_data=[user2, user3])
     count = 2
-
+    create_context2.filter_keys = return_true
     # elif db.drivername() == "postgresql":
     #     count = 0
     assert {
         "status": 201,
         "message": "Insert ok!",
         "meta": {"count": count}
-    } == await api.post(create_context2, return_true)
+    } == await api.post(create_context2)
     user1["id"] = 1
     user2["id"] = 2
     user3["id"] = 3
     query_context = Context("get", "/user", {})
+    query_context.filter_keys = return_true
     assert {
         "status": 200,
         "message": "Query ok!",
         "data": [user1, user2, user3]
-    } == await api.get(query_context, return_true)
+    } == await api.get(query_context)
 
     await db.drop_table(User)
 
@@ -130,6 +136,7 @@ async def test_view_delete(db):
     api = ApiView(db)
     await insert_user(api)
     query_context = Context("get", "/user", {})
+    query_context.filter_keys = return_true
     delete_context = Context(
         "delete",
         "",
@@ -137,16 +144,17 @@ async def test_view_delete(db):
         form_data={"id": 1},
         url_param={"id": 1}
     )
+    delete_context.filter_keys = return_true
     assert {
         "status": 200,
         "message": "Delete ok!",
         "meta": {"count": 1}
-    } == await api.delete(delete_context, return_true)
+    } == await api.delete(delete_context)
     assert {
         "status": 200,
         "message": "Query ok!",
         "data": []
-    } == await api.get(query_context, return_true)
+    } == await api.get(query_context)
     await db.drop_table(User)
 
 
@@ -169,18 +177,20 @@ async def test_view_update(db):
             "values": {"account": "test2"},
         },
     )
+    put_context.filter_keys = return_true
     assert {
         "status": 201,
         "message": "Update ok!",
         "meta": {"count": 1}
-    } == await api.put(put_context, return_true)
+    } == await api.put(put_context)
     user2["id"] = 1
     query_context = Context("get", "/user", {})
+    query_context.filter_keys = return_true
     assert {
         "status": 200,
         "message": "Query ok!",
         "data": [user2]
-    } == await api.get(query_context, return_true)
+    } == await api.get(query_context)
     count = 0
     if db.drivername() in ("sqlite", "postgresql"):
         count = 1
@@ -188,13 +198,15 @@ async def test_view_update(db):
         "status": 201,
         "message": "Update ok!",
         "meta": {"count": count}
-    } == await api.patch(put_context, return_true)
+    } == await api.patch(put_context)
     await db.drop_table(User)
+
 
 @pytest.mark.asyncio
 async def test_view_name(db):
     api = ApiView(db)
     assert api.name == User.name
+
 
 @pytest.mark.asyncio
 async def test_generate_sql(db):

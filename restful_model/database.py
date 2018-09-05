@@ -101,7 +101,7 @@ class DataBase(object):
         async with self.engine.acquire() as conn:
             async with conn.begin():
                 for table in tables:
-                    return await conn.execute(self.create_table_sql(table))
+                    await conn.execute(self.create_table_sql(table))
 
     def drop_table_sql(self, table: 'sa.Table') -> DropTable:
         """
@@ -183,17 +183,27 @@ class DataBase(object):
         执行DML语句
         """
         engine = self.engine
-        async with engine.acquire() as conn:
-            async with conn.begin():
-                if isinstance(sql, list):
-                    count = 0
-                    for s in sql:
-                        async with conn.execute(s) as cursor:
-                            count += cursor.rowcount
-                else:
-                    async with conn.execute(sql, data) as cursor:
-                        count = cursor.rowcount
-            return count
+        if conn is None:
+            async with engine.acquire() as conn:
+                async with conn.begin():
+                    if isinstance(sql, list):
+                        count = 0
+                        for s in sql:
+                            async with conn.execute(s) as cursor:
+                                count += cursor.rowcount
+                    else:
+                        async with conn.execute(sql, data) as cursor:
+                            count = cursor.rowcount
+                return count
+        if isinstance(sql, list):
+            count = 0
+            for s in sql:
+                async with conn.execute(s) as cursor:
+                    count += cursor.rowcount
+        else:
+            async with conn.execute(sql, data) as cursor:
+                count = cursor.rowcount
+        return count
 
     async def execute_insert(self, sql, conn=None):
         """

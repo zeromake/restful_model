@@ -1,8 +1,8 @@
 from sanic import Sanic
 from sanic.constants import HTTP_METHODS
 from restful_model import DataBase
-from restful_model.extend.sanic import ApiView
-from .model import User
+from restful_model.extend.sanic import ApiView, PolymerizationView
+from .model import User, UserConfig
 import logging
 from datetime import datetime, timezone, timedelta
 
@@ -31,7 +31,7 @@ def get_offset_timestamp(zone=None, **kwargs) -> int:
 
 class UserView(ApiView):
     __model__ = User
-    __methods__ = {"post", "get", "put"}
+    __methods__ = {"post", "get", "put", "delete"}
     __filter_keys__ = {
         "post": ({"id",},),
         "get": ({"password",},),
@@ -46,6 +46,8 @@ class UserView(ApiView):
                 d["create_time"] = now
         return await next_handle()
 
+class UserConfigView(ApiView):
+    __model__ = UserConfig
 
 app = Sanic()
 
@@ -59,11 +61,21 @@ async def setup_db(app, loop):
         app.db.loop = loop
         app.db.engine = await app.db.create_engine(echo=True)
         if not await app.db.exists_table(User.name):
-            await app.db.create_table(User)
+            await app.db.create_tables([User, UserConfig])
 
 userView = UserView.as_view(app.db)
+userConfigView = UserConfigView.as_view(app.db)
+
+pView = PolymerizationView(app.db)
+pView.add_view(userView.view)
+pView.add_view(userConfigView.view)
+
 app.add_route(userView, "/user", HTTP_METHODS)
 app.add_route(userView, "/user/<id:int>", HTTP_METHODS)
+app.add_route(pView.as_view("post"), "/polymerization/post", HTTP_METHODS)
+app.add_route(pView.as_view("delete"), "/polymerization/delete", HTTP_METHODS)
+app.add_route(pView.as_view("put"), "/polymerization/put", HTTP_METHODS)
+app.add_route(pView.as_view("patch"), "/polymerization/patch", HTTP_METHODS)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)

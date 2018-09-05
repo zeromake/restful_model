@@ -10,8 +10,9 @@ restful_model is a `sqlalchemy`_ auto generate REATful API
 
 __version__ = "0.1.0"
 
-__all__ = ["Context", "DataBase", "BaseView"]
+__all__ = ["Context", "DataBase", "BaseView", "BasePolymerization"]
 
 from .context import Context
 from .database import DataBase
 from .view import BaseView
+from .polymerization import BasePolymerization

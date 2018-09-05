@@ -8,8 +8,8 @@ class Context(object):
     def __init__(
             self,
             method: str,
-            url_path: str,
-            headers: Dict[str, Union[str, List[str]]],
+            url_path: str = "",
+            headers: Dict[str, Union[str, List[str]]] = {},
             url_param: Optional[Dict[str, Any]] = None,
             form_data: Optional[Dict[str, Any]] = None,
             args: Optional[Dict[str, Any]] = None,
@@ -32,6 +32,8 @@ class Context(object):
         self.args: Optional[Dict[str, Any]] = args
         self.raw_args: Optional[Dict[str, Any]] = raw_args
         self.sessions: Optional[Dict[str, Any]] = sessions
+        self.filter_keys = None
+        # self.cache = None
 
     def __repr__(self):
         return "<Context %s>" % hash(

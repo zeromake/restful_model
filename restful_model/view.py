@@ -1,5 +1,6 @@
 import json
 import asyncio
+import sqlalchemy as sa
 
 from .database import DataBase
 from .utils import (
@@ -37,6 +38,14 @@ class BaseView(object):
         self.db = db
         self.cache = {}
 
+    def get_primary(self):
+        """
+        获取主键
+        """
+        for column in self.model.columns:
+            if column.primary_key and isinstance(column.type, sa.Integer):
+                return column
+
     @property
     def name(self):
         return self.model.name
@@ -45,10 +54,11 @@ class BaseView(object):
     def model(self):
         return self.__model__
 
-    def get_sql(self, context: Context, filter_keys):
+    def get_sql(self, context: Context):
         """
         分析请求生成sql
         """
+        filter_keys = context.filter_keys
         form_data = context.form_data
         keys = form_data.get("keys")
         where = form_data.get("where")
@@ -66,13 +76,14 @@ class BaseView(object):
             self.db.drivername()
         )
 
-    async def get(self, context: Context, filter_keys):
+    async def get(self, context: Context):
         """
         GET 查询请求的统一调用
         """
+        # filter_keys = context.filter_keys
         form_data = context.form_data
         limit = form_data.get("limit")
-        sql_arr = self.get_sql(context, filter_keys)
+        sql_arr = self.get_sql(context)
         if isinstance(sql_arr, tuple):
             sql, sql_count = sql_arr
             async with self.db.engine.acquire() as conn:
@@ -109,18 +120,20 @@ class BaseView(object):
                         'data': data
                     }
 
-    def post_sql(self, context: Context, filter_keys):
+    def post_sql(self, context: Context):
         """
         分析请求生成sql
         """
+        filter_keys = context.filter_keys
         form_data = context.form_data
         return insert_sql(self.model, form_data, filter_keys)
 
-    async def post(self, context: Context, filter_keys):
+    async def post(self, context: Context):
         """
         插入
         """
-        sql = self.post_sql(context, filter_keys)
+        # filter_keys = context.filter_keyss
+        sql = self.post_sql(context)
         count, rowid = await self.db.execute_insert(sql)
         res = {
             'status': 201,
@@ -133,18 +146,20 @@ class BaseView(object):
             res["meta"]["rowid"] = rowid
         return res
 
-    def delete_sql(self, context: Context, filter_keys):
+    def delete_sql(self, context: Context):
         """
         分析请求生成sql
         """
+        # filter_keys = context.filter_keys
         form_data = context.form_data
-        return delete_sql(self.model, form_data, filter_keys)
+        return delete_sql(self.model, form_data)
 
-    async def delete(self, context: Context, filter_keys):
+    async def delete(self, context: Context):
         """
         删除
         """
-        sql = self.delete_sql(context, filter_keys)
+        # filter_keys = context.filter_keys
+        sql = self.delete_sql(context)
         count = await self.db.execute_dml(sql)
         return {
             'status': 200,
@@ -154,13 +169,14 @@ class BaseView(object):
             },
         }
 
-    async def put(self, context: Context, filter_keys):
+    async def put(self, context: Context):
         """
         更新
         """
+        # filter_keys = context.filter_keys
         form_data = context.form_data
         data = form_data.get("data")
-        sql = update_sql(self.model, form_data, filter_keys)
+        sql = update_sql(self.model, form_data)
         count = await self.db.execute_dml(sql, data)
         return {
             'status': 201,
@@ -233,13 +249,13 @@ class BaseView(object):
                         "message": "Method Not Allowed: %s" % method,
                     }
                 if ok:
-                    res = handle(context, filter_keys)
+                    res = handle(context)
                 else:
                     res = handle(context, next_handle)
                 if asyncio.iscoroutine(res):
                     return await res
                 return res
-
+            context.filter_keys = filter_keys
             return await next_handle()
         except Exception as e:
             LOGGER.error("view.BaseView.dispatch_request Error", exc_info=e)

@@ -158,6 +158,25 @@ def handle_where_param(
         return sa.or_(*data) if is_or else sa.and_(*data)
 
 
+def inject_value(value: str, cache):
+    arr = value[1:].split(".")
+    table = arr[0]
+    if len(arr) == 3:
+        index = int(arr[1])
+        field = arr[2]
+    else:
+        index = 0
+        field = arr[1]
+    if table in cache:
+        table_cache = cache[table]
+        if isinstance(table_cache, list):
+            if field in table_cache[index]:
+                return table_cache[index][field]
+        elif field in table_cache:
+            return table_cache[field]
+    return value
+
+
 def insert_sql(model: sa.Table, data, filter_list=return_true) -> dml.Insert:
     """
     生成插入语句对象
